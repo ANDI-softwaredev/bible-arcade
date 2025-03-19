@@ -5,6 +5,7 @@ import { useLocation } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "./app-sidebar";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "./theme-toggle";
 
 interface LayoutProps {
   children: ReactNode;
@@ -36,6 +37,9 @@ export function Layout({ children, fullWidth = false, className }: LayoutProps) 
 
   return (
     <SidebarProvider>
+      <div className="fixed top-4 right-8 z-50">
+        <ThemeToggle />
+      </div>
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         

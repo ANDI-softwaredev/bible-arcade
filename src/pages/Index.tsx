@@ -1,10 +1,10 @@
-
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { BookOpen, ChevronRight, BarChart2, BookMarked, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 // Fading animation variants for elements
 const fadeIn = {
@@ -75,11 +75,17 @@ const Index = () => {
             <Link to="/login" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
               Login
             </Link>
+            <ThemeToggle />
           </nav>
           
-          <Link to="/register">
-            <Button className="px-4 md:px-6">Get Started</Button>
-          </Link>
+          <div className="flex items-center gap-4">
+            <div className="md:hidden">
+              <ThemeToggle />
+            </div>
+            <Link to="/register">
+              <Button className="px-4 md:px-6">Get Started</Button>
+            </Link>
+          </div>
         </div>
       </header>
       
