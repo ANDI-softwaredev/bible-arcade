@@ -73,7 +73,7 @@ export function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <Sidebar collapsed={collapsed} className="transition-all duration-300">
+    <Sidebar className={cn("transition-all duration-300", collapsed ? "w-20" : "w-64")}>
       <SidebarHeader className="px-4 py-6 flex items-center justify-between">
         <div className={cn("flex items-center gap-2 transition-all", 
           collapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100")}>
