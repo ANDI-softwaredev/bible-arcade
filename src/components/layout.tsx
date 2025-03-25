@@ -3,7 +3,7 @@ import { ReactNode, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useLocation } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
-import { AppSidebar } from "./app-sidebar";
+import { AppSidebar, MobileMenuTrigger } from "./app-sidebar";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "./theme-toggle";
 
@@ -40,6 +40,9 @@ export function Layout({ children, fullWidth = false, className }: LayoutProps) 
       <div className="fixed top-4 right-8 z-50">
         <ThemeToggle />
       </div>
+      
+      <MobileMenuTrigger />
+      
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         
@@ -50,7 +53,7 @@ export function Layout({ children, fullWidth = false, className }: LayoutProps) 
           animate="visible"
           exit="exit"
           className={cn(
-            "flex-1 pb-12",
+            "flex-1 pb-12 pt-16 md:pt-12",
             fullWidth ? "px-4 sm:px-6" : "container",
             className
           )}

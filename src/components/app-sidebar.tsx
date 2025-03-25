@@ -12,8 +12,10 @@ import {
   Search,
   Settings,
   User,
+  Menu,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Sidebar,
   SidebarContent,
@@ -25,7 +27,10 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  useSidebar,
 } from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
+import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
 
 const mainMenuItems = [
   {
@@ -68,9 +73,35 @@ const userMenuItems = [
   },
 ];
 
+export function MobileMenuTrigger() {
+  const isMobile = useIsMobile();
+  const { openMobile, setOpenMobile } = useSidebar();
+  
+  if (!isMobile) return null;
+  
+  return (
+    <Drawer open={openMobile} onOpenChange={setOpenMobile}>
+      <DrawerTrigger asChild>
+        <Button variant="ghost" size="icon" className="md:hidden fixed top-4 left-4 z-50">
+          <Menu className="h-5 w-5" />
+          <span className="sr-only">Toggle Menu</span>
+        </Button>
+      </DrawerTrigger>
+      <DrawerContent className="p-0">
+        <div className="h-[80vh]">
+          <SidebarContent />
+        </div>
+      </DrawerContent>
+    </Drawer>
+  );
+}
+
 export function AppSidebar() {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+  const isMobile = useIsMobile();
+
+  if (isMobile) return null;
 
   return (
     <Sidebar className={cn("transition-all duration-300", collapsed ? "w-20" : "w-64")}>
