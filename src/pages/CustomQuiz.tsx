@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Layout } from "@/components/layout";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,7 +16,6 @@ import {
   Download, 
   Calendar, 
   Save,
-  Cube3D,
   Scan,
   Sparkles,
   Smartphone,
@@ -214,7 +212,6 @@ function QuizCreator() {
 }
 
 function SavedQuizzes() {
-  // This would typically come from an API or database
   const savedQuizzes = [
     { id: 1, title: "Romans Study", questions: 10, type: "multiple-choice", created: "2023-05-15" },
     { id: 2, title: "Psalms Overview", questions: 15, type: "true-false", created: "2023-06-02" },
@@ -270,7 +267,7 @@ function MobileAR() {
       id: 1, 
       title: "3D Bible Scenes", 
       description: "Experience biblical scenes in augmented reality",
-      icon: Cube3D 
+      icon: Scan 
     },
     { 
       id: 2, 
@@ -352,7 +349,7 @@ function CustomQuiz() {
               Saved Quizzes
             </TabsTrigger>
             <TabsTrigger value="ar" className="relative">
-              <Cube3D className="h-4 w-4 mr-2" />
+              <Scan className="h-4 w-4 mr-2" />
               Mobile AR
               <span className="absolute -top-1 -right-1 flex h-3 w-3">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary/60 opacity-75"></span>
