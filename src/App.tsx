@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,6 +15,7 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Progress from "./pages/Progress";
 import Study from "./pages/Study";
+import CustomQuiz from "./pages/CustomQuiz"; // Add new page import
 import NotFound from "./pages/NotFound";
 
 // Create a new query client
@@ -71,6 +73,11 @@ const App = () => {
                 <Route path="/study" element={
                   <ProtectedRoute>
                     <Study />
+                  </ProtectedRoute>
+                } />
+                <Route path="/custom-quiz" element={
+                  <ProtectedRoute>
+                    <CustomQuiz />
                   </ProtectedRoute>
                 } />
                 

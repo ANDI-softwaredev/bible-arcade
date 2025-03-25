@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { 
@@ -12,6 +13,7 @@ import {
   Settings,
   User,
   Menu,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -30,6 +32,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
+import { Badge } from "@/components/ui/badge";
 
 const mainMenuItems = [
   {
@@ -46,6 +49,11 @@ const mainMenuItems = [
     title: "Bible Study",
     icon: BookOpen,
     href: "/study",
+  },
+  {
+    title: "Custom Quiz",
+    icon: FileText,
+    href: "/custom-quiz",
   },
   {
     title: "Bookmarks",
@@ -135,7 +143,7 @@ function SidebarMobileContent() {
           </div>
           <div className="flex flex-col">
             <span className="text-sm font-medium">Samuel D.</span>
-            <span className="text-xs text-muted-foreground">Premium</span>
+            <Badge variant="secondary" className="text-xs mt-1 py-0 px-2">Premium</Badge>
           </div>
         </div>
       </div>
@@ -272,7 +280,7 @@ export function AppSidebar() {
             collapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100"
           )}>
             <span className="text-sm font-medium">Samuel D.</span>
-            <span className="text-xs text-muted-foreground">Premium</span>
+            <Badge variant="secondary" className="text-xs mt-1 py-0 px-2">Premium</Badge>
           </div>
         </div>
       </SidebarFooter>
