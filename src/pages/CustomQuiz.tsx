@@ -7,7 +7,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileUpload, Plus, FileText, BookOpen, List, CheckSquare, Download, Calendar } from "lucide-react";
+import { 
+  FileUp, 
+  Plus, 
+  FileText, 
+  BookOpen, 
+  List, 
+  CheckSquare, 
+  Download, 
+  Calendar, 
+  Save,
+  Cube3D,
+  Scan,
+  Sparkles,
+  Smartphone,
+  QrCode
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 
@@ -23,6 +38,7 @@ function QuizCreator() {
   const [numQuestions, setNumQuestions] = useState("10");
   const [quizType, setQuizType] = useState("multiple-choice");
   const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -69,6 +85,28 @@ function QuizCreator() {
         description: `Your "${title}" quiz is ready to use`
       });
     }, 2000);
+  };
+
+  const handleSaveQuiz = () => {
+    if (!title.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Missing title",
+        description: "Please provide a title for your quiz"
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    
+    // Simulate saving to database
+    setTimeout(() => {
+      setIsSaving(false);
+      toast({
+        title: "Quiz saved successfully",
+        description: `"${title}" has been saved to your database`
+      });
+    }, 1500);
   };
 
   return (
@@ -148,7 +186,22 @@ function QuizCreator() {
           </div>
         </div>
       </CardContent>
-      <CardFooter className="flex justify-end">
+      <CardFooter className="flex justify-between">
+        <Button 
+          variant="outline" 
+          onClick={handleSaveQuiz} 
+          disabled={isSaving || !title.trim()}
+        >
+          {isSaving ? (
+            <>Saving</>
+          ) : (
+            <>
+              <Save className="h-4 w-4 mr-2" />
+              Save to Database
+            </>
+          )}
+        </Button>
+        
         <Button 
           onClick={handleCreateQuiz} 
           disabled={isLoading || !file || !title.trim()}
@@ -211,6 +264,75 @@ function SavedQuizzes() {
   );
 }
 
+function MobileAR() {
+  const arExperiences = [
+    { 
+      id: 1, 
+      title: "3D Bible Scenes", 
+      description: "Experience biblical scenes in augmented reality",
+      icon: Cube3D 
+    },
+    { 
+      id: 2, 
+      title: "Scripture Places", 
+      description: "Visit historical biblical locations in AR",
+      icon: Scan 
+    },
+    { 
+      id: 3, 
+      title: "Characters AR", 
+      description: "Interact with biblical figures in your space",
+      icon: Sparkles 
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="p-6 rounded-lg bg-gradient-to-br from-indigo-900/60 to-purple-800/60 backdrop-blur-sm border border-indigo-500/30 shadow-lg">
+        <h3 className="text-xl font-bold text-white mb-2 flex items-center">
+          <Smartphone className="h-5 w-5 mr-2 text-indigo-300" />
+          Mobile AR Experience
+        </h3>
+        <p className="text-indigo-100">
+          Access powerful augmented reality features directly from your mobile device.
+          Point your camera at study materials to bring them to life.
+        </p>
+        <div className="mt-4 flex items-center gap-2">
+          <QrCode className="h-10 w-10 text-white" />
+          <div>
+            <Badge className="bg-indigo-600 hover:bg-indigo-700">New Feature</Badge>
+            <p className="text-xs text-indigo-200 mt-1">Scan this QR code with your mobile device to access AR features</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {arExperiences.map((exp) => (
+          <Card key={exp.id} className="overflow-hidden border border-purple-500/20 bg-background/80 backdrop-blur-sm">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center">
+                  <exp.icon className="h-5 w-5 text-primary" />
+                </div>
+                <CardTitle className="text-md">{exp.title}</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">{exp.description}</p>
+            </CardContent>
+            <CardFooter>
+              <Button variant="outline" size="sm" className="w-full">
+                <Sparkles className="h-4 w-4 mr-2" />
+                Launch Experience
+              </Button>
+            </CardFooter>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function CustomQuiz() {
   return (
     <Layout>
@@ -220,7 +342,7 @@ function CustomQuiz() {
         </div>
         
         <Tabs defaultValue="create" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="create">
               <Plus className="h-4 w-4 mr-2" />
               Create New
@@ -229,12 +351,23 @@ function CustomQuiz() {
               <FileText className="h-4 w-4 mr-2" />
               Saved Quizzes
             </TabsTrigger>
+            <TabsTrigger value="ar" className="relative">
+              <Cube3D className="h-4 w-4 mr-2" />
+              Mobile AR
+              <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary/60 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+              </span>
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="create" className="mt-6">
             <QuizCreator />
           </TabsContent>
           <TabsContent value="saved" className="mt-6">
             <SavedQuizzes />
+          </TabsContent>
+          <TabsContent value="ar" className="mt-6">
+            <MobileAR />
           </TabsContent>
         </Tabs>
       </div>
