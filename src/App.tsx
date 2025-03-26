@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 
 // Import pages
 import Index from "./pages/Index";
@@ -24,75 +25,75 @@ const queryClient = new QueryClient();
 
 // Auth guard component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const [loading, setLoading] = useState(true);
-  const [authenticated, setAuthenticated] = useState(false);
+  const { isAuthenticated, isLoading } = useAuth();
   
-  useEffect(() => {
-    // Check if user is logged in
-    const user = localStorage.getItem("user");
-    setAuthenticated(!!user);
-    setLoading(false);
-  }, []);
-  
-  if (loading) {
+  if (isLoading) {
     return <div className="min-h-screen bg-background" />;
   }
   
-  if (!authenticated) {
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
   
   return <>{children}</>;
 };
 
+const AppRoutes = () => {
+  return (
+    <BrowserRouter>
+      <AnimatePresence mode="wait">
+        <Routes>
+          {/* Public routes */}
+          <Route path="/" element={<Index />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          
+          {/* Protected routes */}
+          <Route path="/dashboard" element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/progress" element={
+            <ProtectedRoute>
+              <Progress />
+            </ProtectedRoute>
+          } />
+          <Route path="/study" element={
+            <ProtectedRoute>
+              <Study />
+            </ProtectedRoute>
+          } />
+          <Route path="/custom-quiz" element={
+            <ProtectedRoute>
+              <CustomQuiz />
+            </ProtectedRoute>
+          } />
+          <Route path="/mobile-ar" element={
+            <ProtectedRoute>
+              <MobileAR />
+            </ProtectedRoute>
+          } />
+          
+          {/* Fallback route */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </AnimatePresence>
+    </BrowserRouter>
+  );
+};
+
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <AnimatePresence mode="wait">
-              <Routes>
-                {/* Public routes */}
-                <Route path="/" element={<Index />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                
-                {/* Protected routes */}
-                <Route path="/dashboard" element={
-                  <ProtectedRoute>
-                    <Dashboard />
-                  </ProtectedRoute>
-                } />
-                <Route path="/progress" element={
-                  <ProtectedRoute>
-                    <Progress />
-                  </ProtectedRoute>
-                } />
-                <Route path="/study" element={
-                  <ProtectedRoute>
-                    <Study />
-                  </ProtectedRoute>
-                } />
-                <Route path="/custom-quiz" element={
-                  <ProtectedRoute>
-                    <CustomQuiz />
-                  </ProtectedRoute>
-                } />
-                <Route path="/mobile-ar" element={
-                  <ProtectedRoute>
-                    <MobileAR />
-                  </ProtectedRoute>
-                } />
-                
-                {/* Fallback route */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </AnimatePresence>
-          </BrowserRouter>
-        </TooltipProvider>
+        <AuthProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <AppRoutes />
+          </TooltipProvider>
+        </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

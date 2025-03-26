@@ -7,15 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Register = () => {
   const navigate = useNavigate();
+  const { register, isLoading } = useAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,29 +30,9 @@ const Register = () => {
       return;
     }
     
-    setIsLoading(true);
-    
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock successful registration
-      localStorage.setItem("user", JSON.stringify({ name, email }));
-      
-      toast({
-        title: "Registration Successful",
-        description: "Welcome to Biblico! Your account has been created.",
-      });
-      
+    const success = await register(name, email, password);
+    if (success) {
       navigate("/dashboard");
-    } catch (error) {
-      toast({
-        title: "Registration Failed",
-        description: "Please check your information and try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
     }
   };
   
