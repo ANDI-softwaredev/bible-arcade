@@ -14,6 +14,7 @@ import {
   User,
   Menu,
   FileText,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -54,6 +55,12 @@ const mainMenuItems = [
     title: "Custom Quiz",
     icon: FileText,
     href: "/custom-quiz",
+  },
+  {
+    title: "Mobile AR",
+    icon: Sparkles,
+    href: "/mobile-ar",
+    badge: "New",
   },
   {
     title: "Bookmarks",
@@ -108,6 +115,11 @@ function SidebarMobileContent() {
                   location.pathname === item.href ? "text-primary" : "text-muted-foreground"
                 )} />
                 <span>{item.title}</span>
+                {item.badge && (
+                  <Badge variant="outline" className="ml-auto text-xs bg-primary/10 text-primary border-primary/20">
+                    {item.badge}
+                  </Badge>
+                )}
               </Link>
             ))}
           </div>
@@ -224,6 +236,11 @@ export function AppSidebar() {
                       )}>
                         {item.title}
                       </span>
+                      {item.badge && !collapsed && (
+                        <Badge variant="outline" className="ml-auto text-xs bg-primary/10 text-primary border-primary/20">
+                          {item.badge}
+                        </Badge>
+                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

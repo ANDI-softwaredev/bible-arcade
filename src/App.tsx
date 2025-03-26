@@ -15,7 +15,8 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Progress from "./pages/Progress";
 import Study from "./pages/Study";
-import CustomQuiz from "./pages/CustomQuiz"; // Add new page import
+import CustomQuiz from "./pages/CustomQuiz";
+import MobileAR from "./pages/MobileAR";
 import NotFound from "./pages/NotFound";
 
 // Create a new query client
@@ -78,6 +79,11 @@ const App = () => {
                 <Route path="/custom-quiz" element={
                   <ProtectedRoute>
                     <CustomQuiz />
+                  </ProtectedRoute>
+                } />
+                <Route path="/mobile-ar" element={
+                  <ProtectedRoute>
+                    <MobileAR />
                   </ProtectedRoute>
                 } />
                 
