@@ -16,6 +16,7 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Progress from "./pages/Progress";
 import Study from "./pages/Study";
+import BibleStudy from "./pages/BibleStudy";
 import CustomQuiz from "./pages/CustomQuiz";
 import MobileAR from "./pages/MobileAR";
 import NotFound from "./pages/NotFound";
@@ -62,6 +63,11 @@ const AppRoutes = () => {
           <Route path="/study" element={
             <ProtectedRoute>
               <Study />
+            </ProtectedRoute>
+          } />
+          <Route path="/bible-study" element={
+            <ProtectedRoute>
+              <BibleStudy />
             </ProtectedRoute>
           } />
           <Route path="/custom-quiz" element={
