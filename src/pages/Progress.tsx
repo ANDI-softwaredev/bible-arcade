@@ -1,12 +1,16 @@
-
 import { useEffect, useState } from "react";
 import { BookOpen, BarChart2, BookMarked, Calendar, ArrowUpRight } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { ProgressChart } from "@/components/progress-chart";
 import { PieChart, Pie, ResponsiveContainer, Cell, Tooltip } from "recharts";
 import { cn } from "@/lib/utils";
+import { 
+  getAllReadingProgress, 
+  calculateOverallProgress,
+  calculateTestamentProgress,
+  ReadingProgress
+} from "@/services/bible-api";
 
-// Mock data
 const weeklyData = [
   { name: "Mon", completion: 30 },
   { name: "Tue", completion: 45 },
@@ -24,32 +28,107 @@ const monthlyData = [
   { name: "Week 4", completion: 70 },
 ];
 
-const bibleCompletion = [
-  { name: "Old Testament", value: 28, color: "hsl(var(--primary))" },
-  { name: "New Testament", value: 65, color: "hsl(var(--accent))" },
-  { name: "Remaining", value: 7, color: "hsl(var(--muted))" },
-];
-
-const bookCompletion = [
-  { name: "Genesis", progress: 100, chapters: 50, lastRead: "2 days ago" },
-  { name: "Exodus", progress: 85, chapters: 40, lastRead: "1 week ago" },
-  { name: "Leviticus", progress: 40, chapters: 27, lastRead: "3 days ago" },
-  { name: "Numbers", progress: 20, chapters: 36, lastRead: "2 weeks ago" },
-  { name: "Deuteronomy", progress: 5, chapters: 34, lastRead: "1 month ago" },
-  { name: "Matthew", progress: 100, chapters: 28, lastRead: "3 days ago" },
-  { name: "Mark", progress: 100, chapters: 16, lastRead: "1 week ago" },
-  { name: "Luke", progress: 90, chapters: 24, lastRead: "Yesterday" },
-  { name: "John", progress: 65, chapters: 21, lastRead: "Today" },
-  { name: "Acts", progress: 78, chapters: 28, lastRead: "4 days ago" },
-];
-
 const Progress = () => {
   const [timeFrame, setTimeFrame] = useState<"weekly" | "monthly">("weekly");
   const [progressData, setProgressData] = useState(weeklyData);
+  const [bibleProgress, setBibleProgress] = useState({
+    overall: 0,
+    oldTestament: 0,
+    newTestament: 0
+  });
+  const [bookCompletion, setBookCompletion] = useState<any[]>([]);
   
   useEffect(() => {
     setProgressData(timeFrame === "weekly" ? weeklyData : monthlyData);
+    
+    const overall = calculateOverallProgress();
+    const oldTestament = calculateTestamentProgress("OT");
+    const newTestament = calculateTestamentProgress("NT");
+    
+    setBibleProgress({
+      overall,
+      oldTestament,
+      newTestament
+    });
+    
+    const readingProgress = getAllReadingProgress();
+    
+    const bookMap = new Map<string, {
+      totalRead: number;
+      lastRead: string;
+    }>();
+    
+    readingProgress.forEach(progress => {
+      if (!bookMap.has(progress.book)) {
+        bookMap.set(progress.book, {
+          totalRead: 0,
+          lastRead: progress.lastRead
+        });
+      }
+      
+      const bookData = bookMap.get(progress.book)!;
+      bookData.totalRead += 1;
+      
+      const currentLastRead = new Date(bookData.lastRead);
+      const progressLastRead = new Date(progress.lastRead);
+      if (progressLastRead > currentLastRead) {
+        bookData.lastRead = progress.lastRead;
+      }
+    });
+    
+    const bookCompletionData = Array.from(bookMap.entries()).map(([book, data]) => {
+      const bookChapters: Record<string, number> = {
+        "Genesis": 50,
+        "Exodus": 40,
+        "Leviticus": 27,
+        "Numbers": 36,
+        "Deuteronomy": 34,
+        "Matthew": 28,
+        "Mark": 16,
+        "Luke": 24,
+        "John": 21,
+        "Acts": 28,
+        "Romans": 16,
+      };
+      
+      const chapters = bookChapters[book] || 30;
+      const progress = Math.min(Math.round((data.totalRead / chapters) * 100), 100);
+      
+      const lastReadDate = new Date(data.lastRead);
+      const now = new Date();
+      const diffDays = Math.floor((now.getTime() - lastReadDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      let lastRead = "Today";
+      if (diffDays === 1) lastRead = "Yesterday";
+      else if (diffDays > 1 && diffDays < 7) lastRead = `${diffDays} days ago`;
+      else if (diffDays >= 7 && diffDays < 30) lastRead = `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) > 1 ? 's' : ''} ago`;
+      else if (diffDays >= 30) lastRead = `${Math.floor(diffDays / 30)} month${Math.floor(diffDays / 30) > 1 ? 's' : ''} ago`;
+      
+      return {
+        name: book,
+        progress,
+        chapters,
+        lastRead
+      };
+    });
+    
+    bookCompletionData.sort((a, b) => b.progress - a.progress);
+    
+    setBookCompletion(bookCompletionData);
   }, [timeFrame]);
+  
+  const bibleCompletion = [
+    { name: "Old Testament", value: bibleProgress.oldTestament, color: "hsl(var(--primary))" },
+    { name: "New Testament", value: bibleProgress.newTestament, color: "hsl(var(--accent))" },
+    { 
+      name: "Remaining", 
+      value: 100 - Math.min(
+        Math.floor((bibleProgress.oldTestament * 0.78 + bibleProgress.newTestament * 0.22) / 100),
+        100
+      ), 
+      color: "hsl(var(--muted))" 
+    },
+  ];
 
   return (
     <Layout>
@@ -146,51 +225,57 @@ const Progress = () => {
         <div className="glass-card rounded-xl p-6 mb-8">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold">Books Progression</h2>
-            <div className="pill">10 of 66 Books</div>
+            <div className="pill">{bookCompletion.length} of 66 Books</div>
           </div>
           
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[600px]">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-4 px-2 font-medium text-muted-foreground">Book</th>
-                  <th className="text-left py-4 px-2 font-medium text-muted-foreground">Progress</th>
-                  <th className="text-left py-4 px-2 font-medium text-muted-foreground">Chapters</th>
-                  <th className="text-left py-4 px-2 font-medium text-muted-foreground">Last Read</th>
-                  <th className="text-left py-4 px-2 font-medium text-muted-foreground">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bookCompletion.map((book) => (
-                  <tr key={book.name} className="border-b border-border">
-                    <td className="py-4 px-2 font-medium">{book.name}</td>
-                    <td className="py-4 px-2">
-                      <div className="flex items-center gap-3">
-                        <div className="w-24 bg-background/50 rounded-full h-2">
-                          <div 
-                            className="bg-primary h-2 rounded-full"
-                            style={{ width: `${book.progress}%` }}
-                          />
-                        </div>
-                        <span className="text-sm">{book.progress}%</span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-2 text-sm">{book.chapters} chapters</td>
-                    <td className="py-4 px-2 text-sm">{book.lastRead}</td>
-                    <td className="py-4 px-2">
-                      <a 
-                        href={`/study/${book.name.toLowerCase()}`}
-                        className="inline-flex items-center text-primary text-sm hover:underline"
-                      >
-                        Continue
-                        <ArrowUpRight className="ml-1 h-3 w-3" />
-                      </a>
-                    </td>
+          {bookCompletion.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[600px]">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-4 px-2 font-medium text-muted-foreground">Book</th>
+                    <th className="text-left py-4 px-2 font-medium text-muted-foreground">Progress</th>
+                    <th className="text-left py-4 px-2 font-medium text-muted-foreground">Chapters</th>
+                    <th className="text-left py-4 px-2 font-medium text-muted-foreground">Last Read</th>
+                    <th className="text-left py-4 px-2 font-medium text-muted-foreground">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {bookCompletion.map((book) => (
+                    <tr key={book.name} className="border-b border-border">
+                      <td className="py-4 px-2 font-medium">{book.name}</td>
+                      <td className="py-4 px-2">
+                        <div className="flex items-center gap-3">
+                          <div className="w-24 bg-background/50 rounded-full h-2">
+                            <div 
+                              className="bg-primary h-2 rounded-full"
+                              style={{ width: `${book.progress}%` }}
+                            />
+                          </div>
+                          <span className="text-sm">{book.progress}%</span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-2 text-sm">{book.chapters} chapters</td>
+                      <td className="py-4 px-2 text-sm">{book.lastRead}</td>
+                      <td className="py-4 px-2">
+                        <a 
+                          href={`/bible-study?book=${book.name}&chapter=1`}
+                          className="inline-flex items-center text-primary text-sm hover:underline"
+                        >
+                          Continue
+                          <ArrowUpRight className="ml-1 h-3 w-3" />
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              Start reading the Bible to track your progress!
+            </div>
+          )}
         </div>
         
         <div className="glass-card rounded-xl p-6">
@@ -228,8 +313,12 @@ const Progress = () => {
                 </div>
                 <h3 className="font-medium">Completed Books</h3>
               </div>
-              <div className="text-2xl font-bold">4 books</div>
-              <p className="text-sm text-muted-foreground mt-1">Genesis, Matthew, Mark, Luke</p>
+              <div className="text-2xl font-bold">
+                {bookCompletion.filter(b => b.progress === 100).length} books
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                {bookCompletion.filter(b => b.progress === 100).slice(0, 3).map(b => b.name).join(", ")}
+              </p>
             </div>
             
             <div className="glass-card rounded-lg p-4">
@@ -237,10 +326,10 @@ const Progress = () => {
                 <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
                   <BarChart2 className="h-4 w-4 text-primary" />
                 </div>
-                <h3 className="font-medium">Verses Memorized</h3>
+                <h3 className="font-medium">Chapters Read</h3>
               </div>
-              <div className="text-2xl font-bold">24 verses</div>
-              <p className="text-sm text-muted-foreground mt-1">+4 this week</p>
+              <div className="text-2xl font-bold">{getAllReadingProgress().length} chapters</div>
+              <p className="text-sm text-muted-foreground mt-1">Keep reading!</p>
             </div>
           </div>
         </div>

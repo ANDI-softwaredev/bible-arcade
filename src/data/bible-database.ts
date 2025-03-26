@@ -1,4 +1,3 @@
-
 // Bible books organization
 export const bibleBooks = {
   oldTestament: [
@@ -252,3 +251,23 @@ export function loadQuizAttempts(): void {
     userQuizAttempts.push(...parsed);
   }
 }
+
+// Add a new function to update the reading progress
+export function updateReadingProgress(progressIncrement: number) {
+  try {
+    // Get current weekly progress
+    const currentProgress = getCurrentWeekProgress();
+    
+    // Add the increment, capped at 100%
+    const newProgress = Math.min(currentProgress + progressIncrement, 100);
+    
+    // Store updated progress
+    localStorage.setItem("weekly-bible-progress", newProgress.toString());
+    
+    return newProgress;
+  } catch (error) {
+    console.error("Error updating reading progress:", error);
+    return 0;
+  }
+}
+

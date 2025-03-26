@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { BookOpen, Calendar, Clock, BookMarked, BarChart2 } from "lucide-react";
 import { Layout } from "@/components/layout";
@@ -6,8 +5,12 @@ import { StatCard } from "@/components/ui/stat-card";
 import { ProgressCard } from "@/components/ui/progress-card";
 import { StudyCard } from "@/components/ui/study-card";
 import { ProgressChart } from "@/components/progress-chart";
+import { 
+  calculateOverallProgress, 
+  calculateTestamentProgress,
+  getAllReadingProgress
+} from "@/services/bible-api";
 
-// Mock data
 const progressData = [
   { name: "Mon", completion: 30 },
   { name: "Tue", completion: 45 },
@@ -51,10 +54,29 @@ const studyModules = [
 const Dashboard = () => {
   const [userName, setUserName] = useState("Samuel");
   const [loading, setLoading] = useState(true);
+  const [bibleProgress, setBibleProgress] = useState({
+    overall: 0,
+    oldTestament: 0,
+    newTestament: 0,
+    chaptersRead: 0
+  });
   
   useEffect(() => {
-    // Simulate data loading
+    // Simulate data loading and calculate Bible reading progress
     const timer = setTimeout(() => {
+      // Calculate progress
+      const overall = calculateOverallProgress();
+      const oldTestament = calculateTestamentProgress("OT");
+      const newTestament = calculateTestamentProgress("NT");
+      const chaptersRead = getAllReadingProgress().length;
+      
+      setBibleProgress({
+        overall,
+        oldTestament,
+        newTestament,
+        chaptersRead
+      });
+      
       setLoading(false);
     }, 1000);
     
@@ -98,8 +120,8 @@ const Dashboard = () => {
             icon={<BookMarked className="h-4 w-4 text-primary" />}
           />
           <StatCard 
-            title="Memorized Verses" 
-            value="24" 
+            title="Chapters Read" 
+            value={bibleProgress.chaptersRead.toString()} 
             icon={<BookOpen className="h-4 w-4 text-primary" />}
             trend={{ value: 4, positive: true }}
           />
@@ -119,17 +141,17 @@ const Dashboard = () => {
             <h2 className="text-xl font-semibold mb-4">Your Goals</h2>
             <ProgressCard 
               title="Overall Bible Reading" 
-              value={42} 
+              value={bibleProgress.overall} 
               icon={<BookOpen className="h-4 w-4 text-primary" />}
             />
             <ProgressCard 
               title="New Testament" 
-              value={65} 
+              value={bibleProgress.newTestament} 
               icon={<BookMarked className="h-4 w-4 text-primary" />}
             />
             <ProgressCard 
               title="Old Testament" 
-              value={28} 
+              value={bibleProgress.oldTestament} 
               icon={<BarChart2 className="h-4 w-4 text-primary" />}
             />
           </div>

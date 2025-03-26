@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { BookOpen, BookText } from "lucide-react";
 import { getCurrentWeekProgress, loadQuizAttempts } from "@/data/bible-database";
+import { saveReadingProgress } from "@/services/bible-api";
 
 const BibleStudy = () => {
   const [activeTab, setActiveTab] = useState("read");
@@ -32,8 +33,9 @@ const BibleStudy = () => {
   
   // Handle reading completion
   const handleReadingComplete = (book: string, chapter: number) => {
-    // In a real app, you would track reading progress
-    console.log(`Completed reading ${book} ${chapter}`);
+    // Track reading progress
+    saveReadingProgress(book, chapter);
+    updateProgress();
   };
   
   return (
@@ -55,7 +57,7 @@ const BibleStudy = () => {
           
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span>Quiz Assessments</span>
+              <span>Bible Study Progress</span>
               <span className="font-medium">{weeklyProgress}%</span>
             </div>
             <Progress value={weeklyProgress} className="h-2" />
