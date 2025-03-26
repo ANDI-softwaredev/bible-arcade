@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { BookOpen, BookText } from "lucide-react";
-import { getCurrentWeekProgress, loadQuizAttempts } from "@/data/bible-database";
+import { getCurrentWeekProgress, loadQuizAttempts, updateReadingProgress } from "@/data/bible-database";
 import { saveReadingProgress } from "@/services/bible-api";
 
 const BibleStudy = () => {
@@ -34,8 +34,13 @@ const BibleStudy = () => {
   // Handle reading completion
   const handleReadingComplete = (book: string, chapter: number) => {
     // Track reading progress
-    saveReadingProgress(book, chapter);
-    updateProgress();
+    try {
+      // We'll handle direct updates here to avoid using require in saveReadingProgress
+      saveReadingProgress(book, chapter);
+      updateProgress();
+    } catch (error) {
+      console.error("Error in handleReadingComplete:", error);
+    }
   };
   
   return (

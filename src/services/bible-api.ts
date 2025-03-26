@@ -1,5 +1,5 @@
 
-import { BibleVerse, BibleChapter } from "@/data/bible-rsv";
+import { BibleVerse, BibleChapter, getChapter as getLocalChapter } from "@/data/bible-rsv";
 
 // API Configuration
 const API_KEY = "74ec65c32bccc3be8b1a835fc6f9e77d"; // Public API key for API.Bible
@@ -177,13 +177,20 @@ const getChapterFromLocalData = (
     "JHN": "John",
     "ACT": "Acts",
     "ROM": "Romans",
+    "OT1": "Genesis",
+    "OT2": "Exodus",
+    "NT1": "Matthew",
+    "NT2": "Mark",
+    "NT3": "Luke",
+    "NT4": "John",
+    "NT5": "Acts",
+    "NT6": "Romans",
   };
   
   const bookName = bookIdToName[bookId.toUpperCase()] || bookId;
   
-  // Use our local data source
-  const { getChapter } = require("@/data/bible-rsv");
-  return getChapter(bookName, chapterNumber);
+  // Use our local data source - use imported function instead of require
+  return getLocalChapter(bookName, chapterNumber);
 };
 
 // Store reading progress in local storage
@@ -226,7 +233,7 @@ export const saveReadingProgress = (book: string, chapter: number): void => {
     );
     
     // Also update the weekly progress in the bible database
-    const { updateReadingProgress } = require("@/data/bible-database");
+    const { updateReadingProgress } = await import("@/data/bible-database");
     updateReadingProgress(5); // Add 5% progress for each chapter read
   } catch (error) {
     console.error("Error saving reading progress:", error);

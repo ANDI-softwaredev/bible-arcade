@@ -19,7 +19,7 @@ import {
   getAllReadingProgress,
   BibleAPIBook
 } from "@/services/bible-api";
-import { BibleChapter } from "@/data/bible-rsv";
+import { BibleChapter, getChapter as getLocalChapter } from "@/data/bible-rsv";
 import { useToast } from "@/hooks/use-toast";
 
 interface BibleReadingProps {
@@ -100,8 +100,8 @@ export function BibleReading({
           setChapterData(chapterData);
         } else {
           // Fallback to local data if book not found
-          const { getChapter } = require("@/data/bible-rsv");
-          setChapterData(getChapter(selectedBook, selectedChapter));
+          const localChapterData = getLocalChapter(selectedBook, selectedChapter);
+          setChapterData(localChapterData);
           
           // Estimate chapter count based on common Bible knowledge
           const chapterCounts: Record<string, number> = {
@@ -123,21 +123,25 @@ export function BibleReading({
         }
       } catch (error) {
         console.error("Error loading chapter:", error);
-        setChapterData(undefined);
+        // Try to get directly from local data as a fallback
+        const localChapterData = getLocalChapter(selectedBook, selectedChapter);
+        setChapterData(localChapterData);
       } finally {
         setLoading(false);
-      }
-      
-      // Mark as read when chapter changes (if callback provided)
-      if (onReadComplete) {
-        onReadComplete(selectedBook, selectedChapter);
       }
     };
     
     if (allBooks.length > 0 || selectedBook) {
       loadChapter();
     }
-  }, [selectedBook, selectedChapter, allBooks, onReadComplete]);
+  }, [selectedBook, selectedChapter, allBooks]);
+  
+  // Call onReadComplete separately after chapter is loaded
+  useEffect(() => {
+    if (!loading && chapterData && onReadComplete) {
+      onReadComplete(selectedBook, selectedChapter);
+    }
+  }, [loading, chapterData, selectedBook, selectedChapter, onReadComplete]);
   
   // Mark chapter as read
   const markAsRead = () => {
