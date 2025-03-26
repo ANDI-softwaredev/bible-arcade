@@ -22,6 +22,10 @@ import {
   SidebarMenuButton,
   useSidebar
 } from "@/components/ui/sidebar";
+import { SidebarTrigger } from "@/components/ui/sidebar-trigger";
+
+// Export the SidebarTrigger as MobileMenuTrigger to fix the import error
+export const MobileMenuTrigger = SidebarTrigger;
 
 export function AppSidebar() {
   const location = useLocation();
