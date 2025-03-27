@@ -1,5 +1,6 @@
 
 import { BibleVerse, BibleChapter, getChapter as getLocalChapter } from "@/data/bible-rsv";
+import { updateReadingProgress as dbUpdateReadingProgress } from "@/data/bible-database";
 
 // API Configuration
 const API_KEY = "74ec65c32bccc3be8b1a835fc6f9e77d"; // Public API key for API.Bible
@@ -233,8 +234,8 @@ export const saveReadingProgress = (book: string, chapter: number): void => {
     );
     
     // Also update the weekly progress in the bible database
-    const { updateReadingProgress } = await import("@/data/bible-database");
-    updateReadingProgress(5); // Add 5% progress for each chapter read
+    // Use the imported function directly instead of dynamic import with await
+    dbUpdateReadingProgress(5); // Add 5% progress for each chapter read
   } catch (error) {
     console.error("Error saving reading progress:", error);
   }
