@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { BookOpen, Calendar, Clock, BookMarked, BarChart2 } from "lucide-react";
 import { Layout } from "@/components/layout";
@@ -5,6 +6,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { ProgressCard } from "@/components/ui/progress-card";
 import { StudyCard } from "@/components/ui/study-card";
 import { ProgressChart } from "@/components/progress-chart";
+import { LearningPlanGenerator } from "@/components/learning-plan-generator";
 import { 
   calculateOverallProgress, 
   calculateTestamentProgress,
@@ -155,6 +157,11 @@ const Dashboard = () => {
               icon={<BarChart2 className="h-4 w-4 text-primary" />}
             />
           </div>
+        </div>
+        
+        {/* Learning Plan Generator */}
+        <div className="mb-8">
+          <LearningPlanGenerator />
         </div>
         
         <div className="mb-8">
