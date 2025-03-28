@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,10 +19,20 @@ import {
   Scan,
   Sparkles,
   Smartphone,
-  QrCode
+  QrCode,
+  Loader2,
+  FileCheck
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { 
+  extractPdfText, 
+  generateAIQuiz, 
+  saveGeneratedQuiz, 
+  getSavedGeneratedQuizzes,
+  GeneratedQuiz
+} from "@/services/quiz-generator";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const QuizTypeOptions = [
   { value: "multiple-choice", label: "Multiple Choice", icon: CheckSquare },
@@ -37,6 +47,9 @@ function QuizCreator() {
   const [quizType, setQuizType] = useState("multiple-choice");
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [previewQuiz, setPreviewQuiz] = useState<GeneratedQuiz | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
   const { toast } = useToast();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -54,7 +67,7 @@ function QuizCreator() {
     }
   };
 
-  const handleCreateQuiz = () => {
+  const handleCreateQuiz = async () => {
     if (!file) {
       toast({
         variant: "destructive",
@@ -75,36 +88,105 @@ function QuizCreator() {
 
     setIsLoading(true);
     
-    // Simulate quiz creation
-    setTimeout(() => {
-      setIsLoading(false);
-      toast({
-        title: "Quiz created successfully",
-        description: `Your "${title}" quiz is ready to use`
+    try {
+      setIsProcessing(true);
+      const extractedText = await extractPdfText(file);
+      
+      const generatedQuiz = await generateAIQuiz({
+        content: extractedText,
+        title: title,
+        numQuestions: parseInt(numQuestions),
+        quizType: quizType as "multiple-choice" | "true-false" | "fill-in-blanks"
       });
-    }, 2000);
+      
+      setPreviewQuiz(generatedQuiz);
+      setShowPreview(true);
+      
+      toast({
+        title: "Quiz generated successfully",
+        description: `Your "${title}" quiz is ready to preview`
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error generating quiz",
+        description: "There was a problem processing your file"
+      });
+      console.error("Quiz generation error:", error);
+    } finally {
+      setIsLoading(false);
+      setIsProcessing(false);
+    }
   };
 
   const handleSaveQuiz = () => {
-    if (!title.trim()) {
+    if (!previewQuiz) {
       toast({
         variant: "destructive",
-        title: "Missing title",
-        description: "Please provide a title for your quiz"
+        title: "No quiz to save",
+        description: "Please generate a quiz first"
       });
       return;
     }
 
     setIsSaving(true);
     
-    // Simulate saving to database
+    saveGeneratedQuiz(previewQuiz);
+    
     setTimeout(() => {
       setIsSaving(false);
+      setShowPreview(false);
+      
       toast({
         title: "Quiz saved successfully",
         description: `"${title}" has been saved to your database`
       });
-    }, 1500);
+    }, 1000);
+  };
+
+  const renderQuizPreview = () => {
+    if (!previewQuiz) return null;
+    
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">{previewQuiz.title}</h3>
+          <Badge variant="outline">{previewQuiz.questions.length} questions</Badge>
+        </div>
+        
+        <div className="max-h-[400px] overflow-y-auto space-y-4 border rounded-md p-4">
+          {previewQuiz.questions.map((question, idx) => (
+            <div key={question.id} className="p-3 border rounded-md bg-secondary/10">
+              <p className="font-medium mb-2">{idx + 1}. {question.questionText}</p>
+              
+              {question.options && (
+                <div className="ml-4 space-y-1">
+                  {question.options.map((option, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <div className="h-3 w-3 rounded-full bg-primary/20" />
+                      <p className={option === question.correctAnswer ? "text-primary font-medium" : ""}>{option}</p>
+                      {option === question.correctAnswer && <Badge variant="outline" className="text-xs">Correct</Badge>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {!question.options && (
+                <div className="ml-4">
+                  <p className="text-primary font-medium">Answer: {question.correctAnswer}</p>
+                </div>
+              )}
+              
+              {question.explanation && (
+                <div className="mt-2 text-sm text-muted-foreground border-t pt-2">
+                  <span className="font-medium">Explanation:</span> {question.explanation}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -187,45 +269,145 @@ function QuizCreator() {
       <CardFooter className="flex justify-between">
         <Button 
           variant="outline" 
-          onClick={handleSaveQuiz} 
-          disabled={isSaving || !title.trim()}
+          onClick={() => {}}
+          disabled={true}
         >
-          {isSaving ? (
-            <>Saving</>
-          ) : (
-            <>
-              <Save className="h-4 w-4 mr-2" />
-              Save to Database
-            </>
-          )}
+          <Save className="h-4 w-4 mr-2" />
+          Save Template
         </Button>
         
         <Button 
           onClick={handleCreateQuiz} 
           disabled={isLoading || !file || !title.trim()}
+          className="gap-2"
         >
-          {isLoading ? "Creating..." : "Create Quiz"}
+          {isLoading ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              {isProcessing ? "Processing..." : "Creating..."}
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-4 w-4" />
+              Generate with AI
+            </>
+          )}
         </Button>
       </CardFooter>
+
+      <Dialog open={showPreview} onOpenChange={setShowPreview}>
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileCheck className="h-5 w-5 text-primary" />
+              AI Generated Quiz Preview
+            </DialogTitle>
+            <DialogDescription>
+              Review your AI-generated quiz before saving it
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            {renderQuizPreview()}
+          </div>
+          
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setShowPreview(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveQuiz} 
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Quiz
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
 
 function SavedQuizzes() {
-  const savedQuizzes = [
-    { id: 1, title: "Romans Study", questions: 10, type: "multiple-choice", created: "2023-05-15" },
-    { id: 2, title: "Psalms Overview", questions: 15, type: "true-false", created: "2023-06-02" },
-    { id: 3, title: "Genesis Chapter 1", questions: 5, type: "fill-in-blanks", created: "2023-06-10" },
-  ];
+  const [savedQuizzes, setSavedQuizzes] = useState<GeneratedQuiz[]>([]);
+  const [generatedQuizzes, setGeneratedQuizzes] = useState<GeneratedQuiz[]>([]);
+  
+  useEffect(() => {
+    const existingQuizzes = [
+      { id: 1, title: "Romans Study", questions: 10, type: "multiple-choice", created: "2023-05-15" },
+      { id: 2, title: "Psalms Overview", questions: 15, type: "true-false", created: "2023-06-02" },
+      { id: 3, title: "Genesis Chapter 1", questions: 5, type: "fill-in-blanks", created: "2023-06-10" },
+    ];
+    
+    const aiQuizzes = getSavedGeneratedQuizzes();
+    setGeneratedQuizzes(aiQuizzes);
+  }, []);
 
   return (
-    <div className="space-y-4">
-      {savedQuizzes.length === 0 ? (
-        <div className="text-center py-10 text-muted-foreground">
-          You haven't created any quizzes yet
-        </div>
-      ) : (
-        savedQuizzes.map((quiz) => (
+    <div className="space-y-6">
+      {generatedQuizzes.length > 0 && (
+        <>
+          <h3 className="text-lg font-medium flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            AI Generated Quizzes
+          </h3>
+          
+          <div className="space-y-4">
+            {generatedQuizzes.map((quiz, index) => (
+              <Card key={`ai-${index}`} className="overflow-hidden">
+                <div className="flex flex-col sm:flex-row sm:items-center">
+                  <CardHeader className="flex-1 pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        {quiz.title}
+                        <Badge variant="outline" className="ml-2">AI Generated</Badge>
+                      </CardTitle>
+                    </div>
+                    <CardDescription className="flex items-center gap-4 mt-1">
+                      <span className="flex items-center gap-1">
+                        <FileText className="h-3.5 w-3.5" />
+                        {quiz.questions.length} questions
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-3.5 w-3.5" />
+                        {new Date(quiz.timestamp).toLocaleDateString()}
+                      </span>
+                    </CardDescription>
+                  </CardHeader>
+                  <div className="flex items-center gap-2 p-4 sm:pr-4">
+                    <Button variant="outline" size="sm">
+                      <Download className="h-4 w-4 mr-1" />
+                      Export
+                    </Button>
+                    <Button size="sm">
+                      <BookOpen className="h-4 w-4 mr-1" />
+                      Start
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </>
+      )}
+      
+      <h3 className="text-lg font-medium">Saved Quizzes</h3>
+      <div className="space-y-4">
+        {[
+          { id: 1, title: "Romans Study", questions: 10, type: "multiple-choice", created: "2023-05-15" },
+          { id: 2, title: "Psalms Overview", questions: 15, type: "true-false", created: "2023-06-02" },
+          { id: 3, title: "Genesis Chapter 1", questions: 5, type: "fill-in-blanks", created: "2023-06-10" },
+        ].map((quiz) => (
           <Card key={quiz.id} className="overflow-hidden">
             <div className="flex flex-col sm:flex-row sm:items-center">
               <CardHeader className="flex-1 pb-2">
@@ -255,8 +437,8 @@ function SavedQuizzes() {
               </div>
             </div>
           </Card>
-        ))
-      )}
+        ))}
+      </div>
     </div>
   );
 }
