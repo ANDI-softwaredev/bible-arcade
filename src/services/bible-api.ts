@@ -1,4 +1,3 @@
-
 import { BibleVerse, BibleChapter, getChapter as getLocalChapter } from "@/data/bible-rsv";
 import { updateReadingProgress as dbUpdateReadingProgress } from "@/data/bible-database";
 
@@ -29,6 +28,13 @@ export interface ReadingProgress {
   chapter: number;
   lastRead: string;
   completed: boolean;
+}
+
+export interface JournalEntry {
+  book: string;
+  chapter: number;
+  text: string;
+  lastUpdated: string;
 }
 
 // Get all books of the Bible
@@ -234,7 +240,7 @@ export const saveReadingProgress = (book: string, chapter: number): void => {
     );
     
     // Also update the weekly progress in the bible database
-    // Use the imported function directly instead of dynamic import with await
+    // Import directly instead of using dynamic import with await
     dbUpdateReadingProgress(5); // Add 5% progress for each chapter read
   } catch (error) {
     console.error("Error saving reading progress:", error);
@@ -291,4 +297,81 @@ export const calculateTestamentProgress = (testament: "OT" | "NT"): number => {
   const completedChapters = relevantProgress.filter(p => p.completed).length;
   
   return Math.round((completedChapters / totalChapters) * 100);
+};
+
+// Save journal entries for chapters
+export const saveChapterJournal = (book: string, chapter: number, text: string): void => {
+  try {
+    // Get current journal data
+    const journalDataStr = localStorage.getItem("bible-chapter-journals");
+    const journalData: JournalEntry[] = journalDataStr
+      ? JSON.parse(journalDataStr)
+      : [];
+    
+    // Check if this chapter already has a journal
+    const existingJournalIndex = journalData.findIndex(
+      (j) => j.book === book && j.chapter === chapter
+    );
+    
+    const now = new Date().toISOString();
+    
+    if (existingJournalIndex >= 0) {
+      // Update existing entry
+      journalData[existingJournalIndex] = {
+        ...journalData[existingJournalIndex],
+        text,
+        lastUpdated: now,
+      };
+    } else {
+      // Add new entry
+      journalData.push({
+        book,
+        chapter,
+        text,
+        lastUpdated: now,
+      });
+    }
+    
+    // Save updated journals
+    localStorage.setItem(
+      "bible-chapter-journals",
+      JSON.stringify(journalData)
+    );
+  } catch (error) {
+    console.error("Error saving chapter journal:", error);
+  }
+};
+
+// Get journal entry for a specific chapter
+export const getChapterJournal = (book: string, chapter: number): string => {
+  try {
+    const journalDataStr = localStorage.getItem("bible-chapter-journals");
+    if (!journalDataStr) return "";
+    
+    const journalData: JournalEntry[] = JSON.parse(journalDataStr);
+    const entry = journalData.find(j => j.book === book && j.chapter === chapter);
+    
+    return entry ? entry.text : "";
+  } catch (error) {
+    console.error("Error getting chapter journal:", error);
+    return "";
+  }
+};
+
+// Get all journal entries
+export const getAllJournalEntries = (): JournalEntry[] => {
+  try {
+    const journalDataStr = localStorage.getItem("bible-chapter-journals");
+    return journalDataStr ? JSON.parse(journalDataStr) : [];
+  } catch (error) {
+    console.error("Error getting journal entries:", error);
+    return [];
+  }
+};
+
+// Get completed books (books with at least one chapter marked as read)
+export const getCompletedBooks = (): string[] => {
+  const readingProgress = getAllReadingProgress();
+  const completedBooks = new Set(readingProgress.map(progress => progress.book));
+  return Array.from(completedBooks);
 };

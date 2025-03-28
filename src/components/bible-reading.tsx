@@ -10,17 +10,20 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, BookOpen, CheckCircle, Clock } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
+import { ChevronLeft, ChevronRight, BookOpen, CheckCircle, Save } from "lucide-react";
 import { bibleBooks } from "@/data/bible-database";
 import { 
   getAllBooks, 
-  getChapterFromAPI,
   saveReadingProgress,
   getAllReadingProgress,
-  BibleAPIBook
+  BibleAPIBook,
+  getChapterJournal,
+  saveChapterJournal
 } from "@/services/bible-api";
-import { BibleChapter, getChapter as getLocalChapter } from "@/data/bible-rsv";
 import { useToast } from "@/hooks/use-toast";
+import { Label } from "@/components/ui/label";
 
 interface BibleReadingProps {
   initialBook?: string;
@@ -35,11 +38,11 @@ export function BibleReading({
 }: BibleReadingProps) {
   const [selectedBook, setSelectedBook] = useState(initialBook);
   const [selectedChapter, setSelectedChapter] = useState(initialChapter);
-  const [chapterData, setChapterData] = useState<BibleChapter | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [chapterCount, setChapterCount] = useState(1);
   const [allBooks, setAllBooks] = useState<BibleAPIBook[]>([]);
   const [readingProgress, setReadingProgress] = useState<Record<string, boolean>>({});
+  const [journalText, setJournalText] = useState("");
   const { toast } = useToast();
   
   // Load all books
@@ -66,6 +69,8 @@ export function BibleReading({
         }));
         
         setAllBooks([...oldTestamentBooks, ...newTestamentBooks]);
+      } finally {
+        setLoading(false);
       }
     };
     
@@ -82,9 +87,9 @@ export function BibleReading({
     setReadingProgress(progressMap);
   }, []);
   
-  // Load chapter data when book or chapter changes
+  // Load chapter data and journal when book or chapter changes
   useEffect(() => {
-    const loadChapter = async () => {
+    const loadChapterJournal = async () => {
       setLoading(true);
       
       try {
@@ -94,15 +99,7 @@ export function BibleReading({
         if (book) {
           // Set chapter count for the selected book
           setChapterCount(book.chapters);
-          
-          // Load chapter data
-          const chapterData = await getChapterFromAPI(book.id, selectedChapter);
-          setChapterData(chapterData);
         } else {
-          // Fallback to local data if book not found
-          const localChapterData = getLocalChapter(selectedBook, selectedChapter);
-          setChapterData(localChapterData);
-          
           // Estimate chapter count based on common Bible knowledge
           const chapterCounts: Record<string, number> = {
             "Genesis": 50,
@@ -121,47 +118,58 @@ export function BibleReading({
           
           setChapterCount(chapterCounts[selectedBook] || 1);
         }
+        
+        // Load journal text for this chapter
+        const journal = getChapterJournal(selectedBook, selectedChapter);
+        setJournalText(journal || "");
       } catch (error) {
-        console.error("Error loading chapter:", error);
-        // Try to get directly from local data as a fallback
-        const localChapterData = getLocalChapter(selectedBook, selectedChapter);
-        setChapterData(localChapterData);
+        console.error("Error loading chapter journal:", error);
       } finally {
         setLoading(false);
       }
     };
     
     if (allBooks.length > 0 || selectedBook) {
-      loadChapter();
+      loadChapterJournal();
     }
   }, [selectedBook, selectedChapter, allBooks]);
   
-  // Call onReadComplete separately after chapter is loaded
-  useEffect(() => {
-    if (!loading && chapterData && onReadComplete) {
-      onReadComplete(selectedBook, selectedChapter);
-    }
-  }, [loading, chapterData, selectedBook, selectedChapter, onReadComplete]);
-  
   // Mark chapter as read
-  const markAsRead = () => {
-    saveReadingProgress(selectedBook, selectedChapter);
-    
-    // Update local state
-    setReadingProgress({
-      ...readingProgress,
-      [`${selectedBook}-${selectedChapter}`]: true
-    });
-    
-    toast({
-      title: "Chapter Completed!",
-      description: `You've marked ${selectedBook} ${selectedChapter} as read.`,
-    });
-    
-    // Call callback if provided
-    if (onReadComplete) {
-      onReadComplete(selectedBook, selectedChapter);
+  const markAsRead = (checked: boolean) => {
+    if (checked) {
+      saveReadingProgress(selectedBook, selectedChapter);
+      
+      // Update local state
+      setReadingProgress({
+        ...readingProgress,
+        [`${selectedBook}-${selectedChapter}`]: true
+      });
+      
+      toast({
+        title: "Chapter Completed!",
+        description: `You've marked ${selectedBook} ${selectedChapter} as read.`,
+      });
+      
+      // Call callback if provided
+      if (onReadComplete) {
+        onReadComplete(selectedBook, selectedChapter);
+      }
+    } else {
+      // Handle unmarking as read (optional)
+      // For now, we'll just show a toast but not actually remove the progress
+      toast({
+        title: "Note",
+        description: "Your reading history has been maintained.",
+      });
     }
+  };
+  
+  const saveJournal = () => {
+    saveChapterJournal(selectedBook, selectedChapter, journalText);
+    toast({
+      title: "Journal Saved",
+      description: "Your notes for this chapter have been saved.",
+    });
   };
   
   // Navigation functions
@@ -212,7 +220,7 @@ export function BibleReading({
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <CardTitle className="flex items-center gap-2 text-xl">
             <BookOpen className="h-5 w-5 text-primary" />
-            <span>RSV Bible</span>
+            <span>Reading Tracker</span>
             {isChapterRead && (
               <Badge variant="outline" className="ml-2 bg-primary/10 text-primary flex items-center gap-1">
                 <CheckCircle className="h-3 w-3" />
@@ -280,28 +288,46 @@ export function BibleReading({
       <CardContent>
         {loading ? (
           <div className="py-8 text-center">Loading...</div>
-        ) : !chapterData ? (
-          <div className="py-8 text-center">
-            <p>This chapter is not available in the sample data.</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Try selecting a different book or chapter.
-            </p>
-          </div>
         ) : (
           <div className="space-y-4">
             <div className="text-xl font-semibold">
               {selectedBook} {selectedChapter}
             </div>
             
-            <div className="space-y-2 text-base leading-7">
-              {chapterData.verses.map((verse) => (
-                <div key={verse.verse} className="flex">
-                  <span className="text-sm font-semibold text-primary mr-2 min-w-[20px]">
-                    {verse.verse}
-                  </span>
-                  <span>{verse.text}</span>
-                </div>
-              ))}
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="chapter-read" 
+                  checked={isChapterRead}
+                  onCheckedChange={markAsRead}
+                />
+                <Label
+                  htmlFor="chapter-read"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  I have read this chapter
+                </Label>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="journal" className="text-sm font-medium">
+                  Journal your thoughts, key verses, and insights:
+                </Label>
+                <Textarea
+                  id="journal"
+                  placeholder="Write your notes, reflections, or key points from this chapter..."
+                  className="min-h-[200px]"
+                  value={journalText}
+                  onChange={(e) => setJournalText(e.target.value)}
+                />
+                <Button 
+                  onClick={saveJournal} 
+                  className="mt-2 flex items-center gap-2"
+                >
+                  <Save className="h-4 w-4" />
+                  Save Journal
+                </Button>
+              </div>
             </div>
             
             <div className="flex justify-between pt-4">
@@ -326,26 +352,6 @@ export function BibleReading({
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
-              
-              <Button
-                variant={isChapterRead ? "outline" : "default"}
-                size="sm"
-                onClick={markAsRead}
-                className="flex items-center gap-1"
-                disabled={isChapterRead}
-              >
-                {isChapterRead ? (
-                  <>
-                    <CheckCircle className="h-4 w-4" />
-                    <span>Completed</span>
-                  </>
-                ) : (
-                  <>
-                    <Clock className="h-4 w-4" />
-                    <span>Mark as Read</span>
-                  </>
-                )}
-              </Button>
             </div>
           </div>
         )}
