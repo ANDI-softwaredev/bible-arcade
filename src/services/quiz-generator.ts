@@ -24,6 +24,15 @@ export interface GeneratedQuiz {
   timestamp: number;
 }
 
+// Timed quiz interface for time-based scoring
+export interface TimedQuizResult {
+  score: number;
+  timeSpent: number; // in seconds
+  correctAnswers: number;
+  totalQuestions: number;
+  timeBonus: number;
+}
+
 // Mock AI quiz generation (in a real app, this would call an AI API like OpenAI)
 export const generateAIQuiz = async (params: QuizGenerationRequest): Promise<GeneratedQuiz> => {
   // Simulate API call with timeout
@@ -79,6 +88,35 @@ export const generateAIQuiz = async (params: QuizGenerationRequest): Promise<Gen
   });
 };
 
+// Calculate time-based score for timed quizzes
+export const calculateTimedQuizScore = (
+  correctAnswers: number, 
+  totalQuestions: number, 
+  timeSpentSeconds: number
+): TimedQuizResult => {
+  // Base score (each correct answer is worth 100 points)
+  const baseScore = correctAnswers * 100;
+  
+  // Time bonus calculation (faster completion = more bonus points)
+  // We'll assume an average of 10 seconds per question is "par"
+  const parTime = totalQuestions * 10;
+  let timeBonus = 0;
+  
+  if (timeSpentSeconds < parTime) {
+    // If under par time, award bonus points (up to 50% of base score)
+    const timeRatio = 1 - (timeSpentSeconds / parTime);
+    timeBonus = Math.round(baseScore * timeRatio * 0.5);
+  }
+  
+  return {
+    score: baseScore + timeBonus,
+    timeSpent: timeSpentSeconds,
+    correctAnswers,
+    totalQuestions,
+    timeBonus
+  };
+};
+
 // Extract text content from a PDF file
 export const extractPdfText = async (file: File): Promise<string> => {
   // This is a mock function that would normally use a PDF library
@@ -125,5 +163,25 @@ export const getSavedGeneratedQuizzes = (): GeneratedQuiz[] => {
   } catch (error) {
     console.error('Error getting saved quizzes:', error);
     return [];
+  }
+};
+
+// Save timed quiz results
+export const saveTimedQuizResult = (result: TimedQuizResult): void => {
+  try {
+    // Get existing results
+    const savedResultsStr = localStorage.getItem('timed-quiz-results');
+    const savedResults: TimedQuizResult[] = savedResultsStr ? JSON.parse(savedResultsStr) : [];
+    
+    // Add new result
+    savedResults.push(result);
+    
+    // Save back to localStorage
+    localStorage.setItem('timed-quiz-results', JSON.stringify(savedResults));
+    
+    // Update progress metrics
+    updateReadingProgress(5); // Add more progress for completing a timed quiz
+  } catch (error) {
+    console.error('Error saving timed quiz result:', error);
   }
 };
