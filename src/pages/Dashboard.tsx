@@ -7,55 +7,21 @@ import { ProgressCard } from "@/components/ui/progress-card";
 import { StudyCard } from "@/components/ui/study-card";
 import { ProgressChart } from "@/components/progress-chart";
 import { LearningPlanGenerator } from "@/components/learning-plan-generator";
+import { toast } from "@/hooks/use-toast";
 import { 
   calculateOverallProgress, 
   calculateTestamentProgress,
-  getAllReadingProgress
+  getAllReadingProgress,
+  getCompletedBooks
 } from "@/services/bible-api";
-
-const progressData = [
-  { name: "Mon", completion: 30 },
-  { name: "Tue", completion: 45 },
-  { name: "Wed", completion: 60 },
-  { name: "Thu", completion: 40 },
-  { name: "Fri", completion: 75 },
-  { name: "Sat", completion: 80 },
-  { name: "Sun", completion: 65 },
-];
-
-const studyModules = [
-  {
-    id: 1,
-    title: "The Gospel of John",
-    description: "Explore the theological depth of John's account",
-    progress: 65,
-    image: "https://images.unsplash.com/photo-1504052434569-70ad5836ab65?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2670&q=80",
-    chip: "New Testament",
-    href: "/study/john"
-  },
-  {
-    id: 2,
-    title: "Psalms of David",
-    description: "Discover the prayers and poetry of King David",
-    progress: 42,
-    image: "https://images.unsplash.com/photo-1602525665453-7483caed6e3a?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2670&q=80",
-    chip: "Old Testament",
-    href: "/study/psalms"
-  },
-  {
-    id: 3,
-    title: "The Book of Acts",
-    description: "Witness the birth and growth of the early church",
-    progress: 78,
-    image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2673&q=80",
-    chip: "New Testament",
-    href: "/study/acts"
-  },
-];
 
 const Dashboard = () => {
   const [userName, setUserName] = useState("Samuel");
   const [loading, setLoading] = useState(true);
+  const [progressData, setProgressData] = useState([]);
+  const [studyStreak, setStudyStreak] = useState(0);
+  const [weeklyReading, setWeeklyReading] = useState(0);
+  const [completedStudies, setCompletedStudies] = useState(0);
   const [bibleProgress, setBibleProgress] = useState({
     overall: 0,
     oldTestament: 0,
@@ -64,26 +30,152 @@ const Dashboard = () => {
   });
   
   useEffect(() => {
-    // Simulate data loading and calculate Bible reading progress
-    const timer = setTimeout(() => {
-      // Calculate progress
-      const overall = calculateOverallProgress();
-      const oldTestament = calculateTestamentProgress("OT");
-      const newTestament = calculateTestamentProgress("NT");
-      const chaptersRead = getAllReadingProgress().length;
+    // Load user data and progress statistics
+    const fetchUserData = async () => {
+      try {
+        // Calculate Bible reading progress
+        const overall = calculateOverallProgress();
+        const oldTestament = calculateTestamentProgress("OT");
+        const newTestament = calculateTestamentProgress("NT");
+        const chaptersRead = getAllReadingProgress().length;
+        const completedBooks = getCompletedBooks().length;
+        
+        setBibleProgress({
+          overall,
+          oldTestament,
+          newTestament,
+          chaptersRead
+        });
+        
+        setCompletedStudies(completedBooks);
+        
+        // Calculate study streak
+        const allProgress = getAllReadingProgress();
+        const streak = calculateStudyStreak(allProgress);
+        setStudyStreak(streak);
+        
+        // Calculate weekly reading hours (approximate based on completed chapters)
+        // Assuming average reading time of 10 minutes per chapter
+        const recentReadings = getRecentReadings(allProgress, 7); // last 7 days
+        const weeklyHours = (recentReadings.length * 10 / 60).toFixed(1);
+        setWeeklyReading(parseFloat(weeklyHours));
+        
+        // Generate weekly progress data for chart
+        const chartData = generateWeeklyProgressData(allProgress);
+        setProgressData(chartData);
+        
+        setLoading(false);
+      } catch (error) {
+        console.error("Error loading user data:", error);
+        toast({
+          title: "Error loading data",
+          description: "Could not load your progress data. Please try again later.",
+          variant: "destructive"
+        });
+        setLoading(false);
+      }
+    };
+    
+    fetchUserData();
+  }, []);
+  
+  // Function to calculate study streak based on reading progress
+  const calculateStudyStreak = (progress) => {
+    if (!progress || progress.length === 0) return 0;
+    
+    // Sort by date (newest first)
+    const sortedProgress = [...progress].sort((a, b) => 
+      new Date(b.lastRead).getTime() - new Date(a.lastRead).getTime()
+    );
+    
+    // Check if user has read today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const latestReadDate = new Date(sortedProgress[0].lastRead);
+    latestReadDate.setHours(0, 0, 0, 0);
+    
+    // If latest reading is not from today or yesterday, streak is broken
+    const diff = (today.getTime() - latestReadDate.getTime()) / (1000 * 60 * 60 * 24);
+    if (diff > 1) return 0;
+    
+    // Count consecutive days
+    let streak = 1;
+    let currentDate = latestReadDate;
+    
+    // Group readings by date
+    const readingsByDate = {};
+    sortedProgress.forEach(item => {
+      const date = new Date(item.lastRead);
+      date.setHours(0, 0, 0, 0);
+      const dateString = date.toISOString().split('T')[0];
+      if (!readingsByDate[dateString]) {
+        readingsByDate[dateString] = [];
+      }
+      readingsByDate[dateString].push(item);
+    });
+    
+    // Count consecutive days
+    for (let i = 1; i <= 30; i++) { // Check up to 30 days back
+      const prevDate = new Date(currentDate);
+      prevDate.setDate(prevDate.getDate() - 1);
+      const prevDateStr = prevDate.toISOString().split('T')[0];
       
-      setBibleProgress({
-        overall,
-        oldTestament,
-        newTestament,
-        chaptersRead
+      if (readingsByDate[prevDateStr]) {
+        streak++;
+        currentDate = prevDate;
+      } else {
+        break;
+      }
+    }
+    
+    return streak;
+  };
+  
+  // Get readings from the past n days
+  const getRecentReadings = (progress, days) => {
+    if (!progress || progress.length === 0) return [];
+    
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+    
+    return progress.filter(item => {
+      const readDate = new Date(item.lastRead);
+      return readDate >= cutoffDate;
+    });
+  };
+  
+  // Generate weekly progress data for chart
+  const generateWeeklyProgressData = (progress) => {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const result = [];
+    
+    // Generate data for the last 7 days
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(today.getDate() - i);
+      date.setHours(0, 0, 0, 0);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      // Count chapters read on this day
+      const dayReadings = progress.filter(item => {
+        const readDate = new Date(item.lastRead);
+        readDate.setHours(0, 0, 0, 0);
+        return readDate.toISOString().split('T')[0] === dateStr;
       });
       
-      setLoading(false);
-    }, 1000);
+      // Calculate completion percentage (max 100%)
+      const completion = Math.min(100, dayReadings.length * 10);
+      
+      result.push({
+        name: days[(dayOfWeek - i + 7) % 7],
+        completion: completion || 0
+      });
+    }
     
-    return () => clearTimeout(timer);
-  }, []);
+    return result;
+  };
   
   const getCurrentTime = () => {
     const hours = new Date().getHours();
@@ -91,6 +183,16 @@ const Dashboard = () => {
     if (hours < 18) return "afternoon";
     return "evening";
   };
+  
+  if (loading) {
+    return (
+      <Layout>
+        <div className="pt-8 sm:pt-12">
+          <h1 className="text-3xl font-bold">Loading dashboard...</h1>
+        </div>
+      </Layout>
+    );
+  }
   
   return (
     <Layout>
@@ -106,26 +208,26 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <StatCard 
             title="Study Streak" 
-            value="7 days" 
+            value={`${studyStreak} days`} 
             icon={<Calendar className="h-4 w-4 text-primary" />}
-            trend={{ value: 12, positive: true }}
+            trend={studyStreak > 0 ? { value: studyStreak, positive: true } : undefined}
           />
           <StatCard 
             title="Weekly Reading" 
-            value="3.5 hours" 
+            value={`${weeklyReading} hours`} 
             icon={<Clock className="h-4 w-4 text-primary" />}
-            trend={{ value: 8, positive: true }}
+            trend={weeklyReading > 0 ? { value: Math.round(weeklyReading * 10), positive: true } : undefined}
           />
           <StatCard 
             title="Completed Studies" 
-            value="6" 
+            value={completedStudies.toString()} 
             icon={<BookMarked className="h-4 w-4 text-primary" />}
           />
           <StatCard 
             title="Chapters Read" 
             value={bibleProgress.chaptersRead.toString()} 
             icon={<BookOpen className="h-4 w-4 text-primary" />}
-            trend={{ value: 4, positive: true }}
+            trend={bibleProgress.chaptersRead > 0 ? { value: 4, positive: true } : undefined}
           />
         </div>
         
@@ -190,5 +292,36 @@ const Dashboard = () => {
     </Layout>
   );
 };
+
+// Pre-defined study modules (could be moved to a separate data file)
+const studyModules = [
+  {
+    id: 1,
+    title: "The Gospel of John",
+    description: "Explore the theological depth of John's account",
+    progress: 65,
+    image: "https://images.unsplash.com/photo-1504052434569-70ad5836ab65?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2670&q=80",
+    chip: "New Testament",
+    href: "/study/john"
+  },
+  {
+    id: 2,
+    title: "Psalms of David",
+    description: "Discover the prayers and poetry of King David",
+    progress: 42,
+    image: "https://images.unsplash.com/photo-1602525665453-7483caed6e3a?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2670&q=80",
+    chip: "Old Testament",
+    href: "/study/psalms"
+  },
+  {
+    id: 3,
+    title: "The Book of Acts",
+    description: "Witness the birth and growth of the early church",
+    progress: 78,
+    image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2673&q=80",
+    chip: "New Testament",
+    href: "/study/acts"
+  },
+];
 
 export default Dashboard;
