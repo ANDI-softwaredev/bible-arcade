@@ -21,7 +21,9 @@ import {
   Smartphone,
   QrCode,
   Loader2,
-  FileCheck
+  FileCheck,
+  Zap,
+  PenTool
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -33,6 +35,7 @@ import {
   GeneratedQuiz
 } from "@/services/quiz-generator";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { TextToQuizGenerator } from "@/components/TextToQuizGenerator";
 
 const QuizTypeOptions = [
   { value: "multiple-choice", label: "Multiple Choice", icon: CheckSquare },
@@ -521,10 +524,15 @@ function CustomQuiz() {
         </div>
         
         <Tabs defaultValue="create" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="create">
               <Plus className="h-4 w-4 mr-2" />
               Create New
+            </TabsTrigger>
+            <TabsTrigger value="text-to-quiz">
+              <PenTool className="h-4 w-4 mr-2" />
+              Text to Quiz
+              <Badge className="ml-2 bg-primary" variant="secondary">New</Badge>
             </TabsTrigger>
             <TabsTrigger value="saved">
               <FileText className="h-4 w-4 mr-2" />
@@ -541,6 +549,9 @@ function CustomQuiz() {
           </TabsList>
           <TabsContent value="create" className="mt-6">
             <QuizCreator />
+          </TabsContent>
+          <TabsContent value="text-to-quiz" className="mt-6">
+            <TextToQuizGenerator />
           </TabsContent>
           <TabsContent value="saved" className="mt-6">
             <SavedQuizzes />
