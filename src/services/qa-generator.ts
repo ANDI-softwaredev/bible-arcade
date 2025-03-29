@@ -23,15 +23,13 @@ export async function generateQAPairsFromText(
   try {
     const { numQuestions = 5, questionTypes = ["what", "who", "where", "when", "why", "how"] } = options;
     
-    // Build query parameters
-    const queryParams = new URLSearchParams();
-    if (numQuestions) queryParams.set("num_questions", numQuestions.toString());
-    if (questionTypes?.length) queryParams.set("question_types", questionTypes.join(","));
-    
     // Call the Supabase edge function
     const { data, error } = await supabase.functions.invoke("generate-qa", {
-      body: { text },
-      query: queryParams.toString()
+      body: { 
+        text,
+        numQuestions,
+        questionTypes
+      }
     });
     
     if (error) {
@@ -61,17 +59,14 @@ export async function generateQAPairsFromPDF(
       throw new Error("Only PDF files are supported");
     }
     
-    // Build query parameters
-    const queryParams = new URLSearchParams();
-    if (numQuestions) queryParams.set("num_questions", numQuestions.toString());
-    if (questionTypes?.length) queryParams.set("question_types", questionTypes.join(","));
+    // Get the function URL
+    const functionUrl = `https://oaffdjrvewnpeghuykoc.supabase.co/functions/v1/generate-qa`;
     
     // Create form data
     const formData = new FormData();
     formData.append("pdf", file);
-    
-    // Get the function URL
-    const functionUrl = `https://oaffdjrvewnpeghuykoc.supabase.co/functions/v1/generate-qa?${queryParams.toString()}`;
+    formData.append("numQuestions", numQuestions.toString());
+    formData.append("questionTypes", questionTypes.join(","));
     
     // Call the function directly with formData
     const response = await fetch(functionUrl, {

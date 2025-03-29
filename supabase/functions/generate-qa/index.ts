@@ -115,23 +115,27 @@ serve(async (req) => {
   }
 
   try {
-    // Parse URL to get query parameters
-    const url = new URL(req.url);
-    const numQuestions = parseInt(url.searchParams.get('num_questions') || '5', 10);
-    const questionTypesParam = url.searchParams.get('question_types');
-    const questionTypes = questionTypesParam 
-      ? questionTypesParam.split(',').map(t => t.trim().toLowerCase())
-      : ["what", "who", "where", "when", "why", "how"];
-    
-    // Check request content type
+    // Parse content type to determine how to handle the request
     const contentType = req.headers.get('content-type') || '';
-    
     let textContent = '';
-    
+    let numQuestions = 5;
+    let questionTypes = ["what", "who", "where", "when", "why", "how"];
+
     if (contentType.includes('multipart/form-data')) {
       // Handle file upload
       const formData = await req.formData();
       const pdfFile = formData.get('pdf');
+      
+      // Get parameters from form data
+      const numQuestionsParam = formData.get('numQuestions');
+      if (numQuestionsParam) {
+        numQuestions = parseInt(numQuestionsParam.toString(), 10);
+      }
+      
+      const questionTypesParam = formData.get('questionTypes');
+      if (questionTypesParam) {
+        questionTypes = questionTypesParam.toString().split(',').map(t => t.trim().toLowerCase());
+      }
       
       if (!pdfFile || !(pdfFile instanceof File)) {
         throw new Error("No PDF file provided in the request");
@@ -154,9 +158,19 @@ serve(async (req) => {
       }
       
       textContent = json.text;
+      
+      // Get parameters from JSON payload
+      if (json.numQuestions) {
+        numQuestions = parseInt(json.numQuestions, 10);
+      }
+      
+      if (json.questionTypes && Array.isArray(json.questionTypes)) {
+        questionTypes = json.questionTypes;
+      }
     }
     
     console.log(`Text content length: ${textContent.length} characters`);
+    console.log(`Generating ${numQuestions} questions of types: ${questionTypes.join(', ')}`);
     
     // Generate QA pairs
     const qaPairs = await generateQAPairs(textContent, numQuestions, questionTypes);
