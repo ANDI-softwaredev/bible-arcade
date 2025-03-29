@@ -1,21 +1,26 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { User, Session } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 
-interface User {
+interface UserProfile {
   id: string;
-  name: string;
-  email: string;
-  createdAt: string;
+  full_name: string | null;
+  avatar_url: string | null;
 }
 
 interface AuthContextType {
   user: User | null;
+  profile: UserProfile | null;
+  session: Session | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
-  register: (name: string, email: string, password: string) => Promise<boolean>;
-  logout: () => void;
+  signInWithEmail: (email: string, password: string) => Promise<{ error: any }>;
+  signInWithGoogle: () => Promise<void>;
+  signUp: (email: string, password: string, name: string) => Promise<{ error: any }>;
+  signOut: () => Promise<void>;
+  updateProfile: (data: Partial<UserProfile>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -30,147 +35,225 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    // Check for existing user session on load
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (error) {
-        console.error("Failed to parse stored user:", error);
-        localStorage.removeItem("user");
+  // Fetch user profile
+  const fetchProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single();
+
+      if (error) {
+        console.error("Error fetching profile:", error);
+        return;
       }
+
+      setProfile(data);
+    } catch (error) {
+      console.error("Error fetching profile:", error);
     }
-    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, currentSession) => {
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+        
+        if (currentSession?.user && event !== 'SIGNED_OUT') {
+          // Use setTimeout to avoid potential supabase auth deadlock
+          setTimeout(() => {
+            fetchProfile(currentSession.user.id);
+          }, 0);
+        } else {
+          setProfile(null);
+        }
+      }
+    );
+
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
+      
+      if (currentSession?.user) {
+        fetchProfile(currentSession.user.id);
+      }
+      
+      setIsLoading(false);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
-    setIsLoading(true);
+  const signInWithEmail = async (email: string, password: string) => {
     try {
-      // Simulate API call - replace with actual API call in production
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Simple validation - in production this would be handled by your backend
-      const usersJson = localStorage.getItem("users") || "[]";
-      const users = JSON.parse(usersJson);
-      
-      const foundUser = users.find((u: any) => 
-        u.email.toLowerCase() === email.toLowerCase() && u.password === password
-      );
-      
-      if (!foundUser) {
-        toast({
-          title: "Login Failed",
-          description: "Invalid email or password.",
-          variant: "destructive",
-        });
-        setIsLoading(false);
-        return false;
-      }
-      
-      // Remove password before storing in state/localStorage
-      const { password: _, ...userWithoutPassword } = foundUser;
-      
-      setUser(userWithoutPassword);
-      localStorage.setItem("user", JSON.stringify(userWithoutPassword));
-      
-      toast({
-        title: "Login Successful",
-        description: "Welcome back to Biblico!",
-      });
-      
-      setIsLoading(false);
-      return true;
-    } catch (error) {
-      console.error("Login error:", error);
-      toast({
-        title: "Login Failed",
-        description: "An unexpected error occurred. Please try again.",
-        variant: "destructive",
-      });
-      setIsLoading(false);
-      return false;
-    }
-  };
-
-  const register = async (name: string, email: string, password: string): Promise<boolean> => {
-    setIsLoading(true);
-    try {
-      // Simulate API call - replace with actual API call in production
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Check if user already exists
-      const usersJson = localStorage.getItem("users") || "[]";
-      const users = JSON.parse(usersJson);
-      
-      if (users.some((u: any) => u.email.toLowerCase() === email.toLowerCase())) {
-        toast({
-          title: "Registration Failed",
-          description: "An account with this email already exists.",
-          variant: "destructive",
-        });
-        setIsLoading(false);
-        return false;
-      }
-      
-      // Create new user
-      const newUser = {
-        id: crypto.randomUUID(),
-        name,
+      const { error } = await supabase.auth.signInWithPassword({
         email,
-        password, // In a real app, this would be hashed
-        createdAt: new Date().toISOString(),
-      };
-      
-      // Store in "database" (localStorage)
-      users.push(newUser);
-      localStorage.setItem("users", JSON.stringify(users));
-      
-      // Remove password before storing in state/localStorage
-      const { password: _, ...userWithoutPassword } = newUser;
-      
-      setUser(userWithoutPassword);
-      localStorage.setItem("user", JSON.stringify(userWithoutPassword));
-      
+        password,
+      });
+
+      if (error) {
+        toast({
+          title: "Sign in failed",
+          description: error.message,
+          variant: "destructive",
+        });
+        return { error };
+      }
+
       toast({
-        title: "Registration Successful",
-        description: "Your account has been created!",
+        title: "Signed in successfully",
+        description: "Welcome back!",
       });
       
-      setIsLoading(false);
-      return true;
-    } catch (error) {
-      console.error("Registration error:", error);
+      return { error: null };
+    } catch (error: any) {
       toast({
-        title: "Registration Failed",
-        description: "An unexpected error occurred. Please try again.",
+        title: "Sign in failed",
+        description: error.message,
         variant: "destructive",
       });
-      setIsLoading(false);
-      return false;
+      return { error };
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem("user");
-    setUser(null);
-    toast({
-      title: "Logged Out",
-      description: "You have been successfully logged out.",
-    });
+  const signInWithGoogle = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      if (error) {
+        toast({
+          title: "Google sign in failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Google sign in failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const signUp = async (email: string, password: string, name: string) => {
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: name,
+          },
+        },
+      });
+
+      if (error) {
+        toast({
+          title: "Sign up failed",
+          description: error.message,
+          variant: "destructive",
+        });
+        return { error };
+      }
+
+      toast({
+        title: "Sign up successful",
+        description: "Welcome to Biblico!",
+      });
+      
+      return { error: null };
+    } catch (error: any) {
+      toast({
+        title: "Sign up failed",
+        description: error.message,
+        variant: "destructive",
+      });
+      return { error };
+    }
+  };
+
+  const signOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast({
+        title: "Signed out",
+        description: "You have been signed out successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Sign out failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const updateProfile = async (data: Partial<UserProfile>) => {
+    try {
+      if (!user) return;
+
+      const { error } = await supabase
+        .from("profiles")
+        .update(data)
+        .eq("id", user.id);
+
+      if (error) {
+        toast({
+          title: "Update failed",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Update local state
+      setProfile({
+        ...profile!,
+        ...data,
+      });
+
+      toast({
+        title: "Profile updated",
+        description: "Your profile has been updated successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Update failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
+        profile,
+        session,
         isLoading,
         isAuthenticated: !!user,
-        login,
-        register,
-        logout,
+        signInWithEmail,
+        signInWithGoogle,
+        signUp,
+        signOut,
+        updateProfile,
       }}
     >
       {children}
