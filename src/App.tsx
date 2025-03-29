@@ -69,62 +69,59 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// Routes Component
 const AppRoutes = () => {
   return (
-    <BrowserRouter>
-      <AnimatePresence mode="wait">
-        <Routes>
-          {/* Public routes */}
-          <Route path="/" element={<Index />} />
-          <Route path="/login" element={
-            <PublicRoute>
-              <Login />
-            </PublicRoute>
-          } />
-          <Route path="/register" element={
-            <PublicRoute>
-              <Register />
-            </PublicRoute>
-          } />
-          <Route path="/auth/callback" element={<AuthCallback />} />
-          
-          {/* Protected routes */}
-          <Route path="/dashboard" element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/progress" element={
-            <ProtectedRoute>
-              <Progress />
-            </ProtectedRoute>
-          } />
-          <Route path="/study" element={
-            <ProtectedRoute>
-              <Study />
-            </ProtectedRoute>
-          } />
-          <Route path="/bible-study" element={
-            <ProtectedRoute>
-              <BibleStudy />
-            </ProtectedRoute>
-          } />
-          <Route path="/custom-quiz" element={
-            <ProtectedRoute>
-              <CustomQuiz />
-            </ProtectedRoute>
-          } />
-          <Route path="/mobile-ar" element={
-            <ProtectedRoute>
-              <MobileAR />
-            </ProtectedRoute>
-          } />
-          
-          {/* Fallback route */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </AnimatePresence>
-    </BrowserRouter>
+    <Routes>
+      {/* Public routes */}
+      <Route path="/" element={<Index />} />
+      <Route path="/login" element={
+        <PublicRoute>
+          <Login />
+        </PublicRoute>
+      } />
+      <Route path="/register" element={
+        <PublicRoute>
+          <Register />
+        </PublicRoute>
+      } />
+      <Route path="/auth/callback" element={<AuthCallback />} />
+      
+      {/* Protected routes */}
+      <Route path="/dashboard" element={
+        <ProtectedRoute>
+          <Dashboard />
+        </ProtectedRoute>
+      } />
+      <Route path="/progress" element={
+        <ProtectedRoute>
+          <Progress />
+        </ProtectedRoute>
+      } />
+      <Route path="/study" element={
+        <ProtectedRoute>
+          <Study />
+        </ProtectedRoute>
+      } />
+      <Route path="/bible-study" element={
+        <ProtectedRoute>
+          <BibleStudy />
+        </ProtectedRoute>
+      } />
+      <Route path="/custom-quiz" element={
+        <ProtectedRoute>
+          <CustomQuiz />
+        </ProtectedRoute>
+      } />
+      <Route path="/mobile-ar" element={
+        <ProtectedRoute>
+          <MobileAR />
+        </ProtectedRoute>
+      } />
+      
+      {/* Fallback route */}
+      <Route path="*" element={<NotFound />} />
+    </Routes>
   );
 };
 
@@ -134,9 +131,13 @@ const App = () => {
       <ThemeProvider>
         <AuthProvider>
           <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <AppRoutes />
+            <BrowserRouter>
+              <AnimatePresence mode="wait">
+                <AppRoutes />
+              </AnimatePresence>
+              <Toaster />
+              <Sonner />
+            </BrowserRouter>
           </TooltipProvider>
         </AuthProvider>
       </ThemeProvider>

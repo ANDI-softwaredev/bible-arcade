@@ -11,8 +11,16 @@ const AuthCallback = () => {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        // Exchange the auth code for a session
-        const { error } = await supabase.auth.getSessionFromUrl();
+        // Get the URL hash (fragment) or query parameters
+        const hash = location.hash;
+        const query = location.search;
+
+        if (!hash && !query) {
+          throw new Error("No auth parameters found in URL");
+        }
+
+        // Process the OAuth callback
+        const { data, error } = await supabase.auth.getSession();
 
         if (error) {
           toast({
