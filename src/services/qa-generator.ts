@@ -59,6 +59,14 @@ export async function generateQAPairsFromPDF(
       throw new Error("Only PDF files are supported");
     }
     
+    // Get the current session for authentication
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData?.session?.access_token;
+    
+    if (!accessToken) {
+      throw new Error("You must be logged in to generate questions from PDF files");
+    }
+    
     // Get the function URL
     const functionUrl = `https://oaffdjrvewnpeghuykoc.supabase.co/functions/v1/generate-qa`;
     
@@ -72,7 +80,7 @@ export async function generateQAPairsFromPDF(
     const response = await fetch(functionUrl, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${(supabase.auth as any).autoRefreshToken.currentSession?.access_token || ""}`
+        "Authorization": `Bearer ${accessToken}`
       },
       body: formData
     });
