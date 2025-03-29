@@ -62,7 +62,7 @@ const Index = () => {
         <div className="container flex items-center justify-between">
           <div className="flex items-center gap-2">
             <BookMarked className="h-6 w-6 text-primary" />
-            <span className="font-semibold text-lg tracking-tight">Biblico</span>
+            <span className="font-semibold text-lg tracking-tight">Bible ARcade</span>
           </div>
           
           <nav className="hidden md:flex items-center gap-6">
@@ -100,7 +100,7 @@ const Index = () => {
               variants={fadeIn}
               className="pill mb-6 inline-block"
             >
-              Modern Bible Learning System
+              A little gift for the Adventist Youth
             </motion.div>
             
             <motion.h1 
@@ -201,12 +201,12 @@ const Index = () => {
           <div className="max-w-6xl mx-auto glass-card rounded-2xl overflow-hidden">
             <div className="grid grid-cols-1 lg:grid-cols-2">
               <div className="p-8 md:p-12 flex flex-col justify-center">
-                <div className="pill mb-4 inline-block">About Biblico</div>
+                <div className="pill mb-4 inline-block">About Bible ARcade</div>
                 <h2 className="text-3xl font-bold mb-4">
                   A modern approach to Bible study
                 </h2>
                 <p className="text-muted-foreground mb-6">
-                  Biblico was designed with a focus on aesthetic beauty and functional simplicity. We believe that spiritual tools should not only be effective but also delightful to use.
+                  Bible ARcade was designed with a focus on aesthetic beauty and functional simplicity. We believe that spiritual tools should not only be effective but also delightful to use.
                 </p>
                 
                 <div className="space-y-4 mb-8">
@@ -262,7 +262,7 @@ const Index = () => {
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-2">
               <BookMarked className="h-5 w-5 text-primary" />
-              <span className="font-semibold">Biblico</span>
+              <span className="font-semibold">Bible ARcade</span>
             </div>
             
             <div className="flex gap-8">
@@ -278,7 +278,7 @@ const Index = () => {
             </div>
             
             <div className="text-sm text-muted-foreground">
-              © {new Date().getFullYear()} Biblico. All rights reserved.
+              © {new Date().getFullYear()} Bible ARcade. Made with love by Andile Dube. All rights reserved.
             </div>
           </div>
         </div>
