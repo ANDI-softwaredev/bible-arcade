@@ -10,27 +10,12 @@ import {
   calculateTestamentProgress,
   ReadingProgress
 } from "@/services/bible-api";
-
-const weeklyData = [
-  { name: "Mon", completion: 30 },
-  { name: "Tue", completion: 45 },
-  { name: "Wed", completion: 60 },
-  { name: "Thu", completion: 40 },
-  { name: "Fri", completion: 75 },
-  { name: "Sat", completion: 80 },
-  { name: "Sun", completion: 65 },
-];
-
-const monthlyData = [
-  { name: "Week 1", completion: 55 },
-  { name: "Week 2", completion: 65 },
-  { name: "Week 3", completion: 45 },
-  { name: "Week 4", completion: 70 },
-];
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Progress = () => {
   const [timeFrame, setTimeFrame] = useState<"weekly" | "monthly">("weekly");
-  const [progressData, setProgressData] = useState(weeklyData);
+  const [periodType, setPeriodType] = useState<"week" | "month">("week");
+  const [progressData, setProgressData] = useState<any[]>([]);
   const [bibleProgress, setBibleProgress] = useState({
     overall: 0,
     oldTestament: 0,
@@ -40,8 +25,6 @@ const Progress = () => {
   const [readingProgress, setReadingProgress] = useState<ReadingProgress[]>([]);
   
   useEffect(() => {
-    setProgressData(timeFrame === "weekly" ? weeklyData : monthlyData);
-    
     const fetchData = async () => {
       const overall = await calculateOverallProgress();
       const oldTestament = await calculateTestamentProgress("OT");
@@ -116,12 +99,83 @@ const Progress = () => {
       });
       
       bookCompletionData.sort((a, b) => b.progress - a.progress);
-      
       setBookCompletion(bookCompletionData);
+      
+      generateProgressData(progress);
     };
     
     fetchData();
-  }, [timeFrame]);
+  }, []);
+  
+  const generateProgressData = (progress: ReadingProgress[]) => {
+    if (periodType === "week") {
+      generateWeeklyData(progress);
+    } else {
+      generateMonthlyData(progress);
+    }
+  };
+  
+  const generateWeeklyData = (progress: ReadingProgress[]) => {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const result = [];
+    
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(today.getDate() - i);
+      date.setHours(0, 0, 0, 0);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      const dayReadings = progress.filter(item => {
+        const readDate = new Date(item.lastRead);
+        readDate.setHours(0, 0, 0, 0);
+        return readDate.toISOString().split('T')[0] === dateStr;
+      });
+      
+      const completion = Math.min(100, dayReadings.length * 10);
+      
+      result.push({
+        name: days[(dayOfWeek - i + 7) % 7],
+        completion: completion || 0
+      });
+    }
+    
+    setProgressData(result);
+  };
+  
+  const generateMonthlyData = (progress: ReadingProgress[]) => {
+    const result = [];
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+    
+    for (let i = 3; i >= 0; i--) {
+      const weekStart = new Date(currentYear, currentMonth, today.getDate() - (i * 7 + 6));
+      const weekEnd = new Date(currentYear, currentMonth, today.getDate() - (i * 7));
+      
+      const weekReadings = progress.filter(item => {
+        const readDate = new Date(item.lastRead);
+        return readDate >= weekStart && readDate <= weekEnd;
+      });
+      
+      const completion = Math.min(100, weekReadings.length * 5);
+      
+      result.push({
+        name: `Week ${4-i}`,
+        completion: completion || 0
+      });
+    }
+    
+    setProgressData(result);
+  };
+  
+  const handlePeriodChange = (value: "week" | "month") => {
+    setPeriodType(value);
+    setTimeFrame(value === "week" ? "weekly" : "monthly");
+    
+    generateProgressData(readingProgress);
+  };
   
   const bibleCompletion = [
     { name: "Old Testament", value: bibleProgress.oldTestament, color: "hsl(var(--primary))" },
@@ -153,10 +207,10 @@ const Progress = () => {
               <h2 className="text-xl font-semibold">Reading Progress</h2>
               <div className="flex gap-2">
                 <button 
-                  onClick={() => setTimeFrame("weekly")}
+                  onClick={() => handlePeriodChange("week")}
                   className={cn(
                     "px-3 py-1 text-sm rounded-full transition-all",
-                    timeFrame === "weekly" 
+                    periodType === "week" 
                       ? "bg-primary/20 text-primary" 
                       : "hover:bg-accent/10"
                   )}
@@ -164,10 +218,10 @@ const Progress = () => {
                   Weekly
                 </button>
                 <button 
-                  onClick={() => setTimeFrame("monthly")}
+                  onClick={() => handlePeriodChange("month")}
                   className={cn(
                     "px-3 py-1 text-sm rounded-full transition-all",
-                    timeFrame === "monthly" 
+                    periodType === "month" 
                       ? "bg-primary/20 text-primary" 
                       : "hover:bg-accent/10"
                   )}
@@ -265,7 +319,7 @@ const Progress = () => {
                       <td className="py-4 px-2 text-sm">{book.lastRead}</td>
                       <td className="py-4 px-2">
                         <a 
-                          href={`/bible-study?book=${book.name}&chapter=1`}
+                          href={`/study?book=${book.name}&chapter=1`}
                           className="inline-flex items-center text-primary text-sm hover:underline"
                         >
                           Continue

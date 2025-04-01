@@ -195,7 +195,7 @@ const Dashboard = () => {
     );
   }
   
-  // Get the user's name for greeting
+  // Get the user's name for greeting from profile
   const userName = profile?.full_name || user?.email?.split('@')[0] || "Friend";
   
   return (

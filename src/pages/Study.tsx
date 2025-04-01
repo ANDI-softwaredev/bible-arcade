@@ -1,11 +1,14 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, BookOpen, Filter } from "lucide-react";
 import { motion } from "framer-motion";
 import { Layout } from "@/components/layout";
 import { Input } from "@/components/ui/input";
 import { StudyCard } from "@/components/ui/study-card";
 import { cn } from "@/lib/utils";
+import { BibleReader } from "@/components/BibleReader";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Mock data
 const studyModules = [
@@ -82,6 +85,8 @@ const categories = [
 const Study = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<Category>("all");
+  const [activeTab, setActiveTab] = useState("studies");
+  const { profile } = useAuth();
   
   const filteredModules = studyModules.filter((module) => {
     // Filter by search query
@@ -95,6 +100,12 @@ const Study = () => {
     
     return matchesSearch && matchesCategory;
   });
+
+  // Handle progress update
+  const handleProgressUpdate = () => {
+    // In a real app, this would refresh progress data
+    console.log("Reading progress updated");
+  };
   
   return (
     <Layout>
@@ -103,77 +114,90 @@ const Study = () => {
           <div className="pill mb-3 inline-block">Bible Study</div>
           <h1 className="text-3xl font-bold">Explore Biblical Teachings</h1>
           <p className="text-muted-foreground mt-2">
-            Dive into our comprehensive Bible study modules
+            Dive into our comprehensive Bible study modules or read directly from the Bible
           </p>
         </header>
         
-        <div className="glass-card rounded-xl p-4 mb-8">
-          <div className="flex flex-col sm:flex-row gap-4 items-center">
-            <div className="relative w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search for studies..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="glass-input pl-10"
-              />
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full mb-8">
+          <TabsList className="w-full grid grid-cols-2">
+            <TabsTrigger value="studies">Study Modules</TabsTrigger>
+            <TabsTrigger value="read">Read the Bible</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="studies">
+            <div className="glass-card rounded-xl p-4 mb-8">
+              <div className="flex flex-col sm:flex-row gap-4 items-center">
+                <div className="relative w-full">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search for studies..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="glass-input pl-10"
+                  />
+                </div>
+                
+                <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto py-1">
+                  {categories.map((category) => (
+                    <button
+                      key={category.id}
+                      onClick={() => setActiveCategory(category.id as Category)}
+                      className={cn(
+                        "whitespace-nowrap px-4 py-2 rounded-full text-sm transition-all",
+                        activeCategory === category.id
+                          ? "bg-primary/20 text-primary"
+                          : "hover:bg-accent/10"
+                      )}
+                    >
+                      {category.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
             
-            <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto py-1">
-              {categories.map((category) => (
-                <button
-                  key={category.id}
-                  onClick={() => setActiveCategory(category.id as Category)}
-                  className={cn(
-                    "whitespace-nowrap px-4 py-2 rounded-full text-sm transition-all",
-                    activeCategory === category.id
-                      ? "bg-primary/20 text-primary"
-                      : "hover:bg-accent/10"
-                  )}
+            {filteredModules.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredModules.map((module) => (
+                  <StudyCard
+                    key={module.id}
+                    title={module.title}
+                    description={module.description}
+                    progress={module.progress}
+                    image={module.image}
+                    chip={module.chip}
+                    href={module.href}
+                  />
+                ))}
+              </div>
+            ) : (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="glass-card rounded-xl p-8 text-center"
+              >
+                <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+                <h3 className="text-xl font-medium mb-2">No studies found</h3>
+                <p className="text-muted-foreground mb-4">
+                  We couldn't find any studies matching your criteria.
+                </p>
+                <button 
+                  onClick={() => {
+                    setSearchQuery("");
+                    setActiveCategory("all");
+                  }}
+                  className="text-primary hover:underline"
                 >
-                  {category.label}
+                  Clear filters
                 </button>
-              ))}
-            </div>
-          </div>
-        </div>
-        
-        {filteredModules.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredModules.map((module) => (
-              <StudyCard
-                key={module.id}
-                title={module.title}
-                description={module.description}
-                progress={module.progress}
-                image={module.image}
-                chip={module.chip}
-                href={module.href}
-              />
-            ))}
-          </div>
-        ) : (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="glass-card rounded-xl p-8 text-center"
-          >
-            <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-            <h3 className="text-xl font-medium mb-2">No studies found</h3>
-            <p className="text-muted-foreground mb-4">
-              We couldn't find any studies matching your criteria.
-            </p>
-            <button 
-              onClick={() => {
-                setSearchQuery("");
-                setActiveCategory("all");
-              }}
-              className="text-primary hover:underline"
-            >
-              Clear filters
-            </button>
-          </motion.div>
-        )}
+              </motion.div>
+            )}
+          </TabsContent>
+          
+          <TabsContent value="read">
+            <BibleReader onProgressUpdate={handleProgressUpdate} />
+          </TabsContent>
+        </Tabs>
       </div>
     </Layout>
   );

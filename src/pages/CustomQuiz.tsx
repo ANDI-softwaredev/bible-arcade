@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +15,8 @@ import {
   Download, 
   Calendar,
   FileCheck,
-  PenTool
+  PenTool,
+  Sparkle
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -26,16 +28,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { TextToQuizGenerator } from "@/components/TextToQuizGenerator";
 
 function SavedQuizzes() {
-  const [savedQuizzes, setSavedQuizzes] = useState<GeneratedQuiz[]>([]);
   const [generatedQuizzes, setGeneratedQuizzes] = useState<GeneratedQuiz[]>([]);
   
   useEffect(() => {
-    const existingQuizzes = [
-      { id: 1, title: "Romans Study", questions: 10, type: "multiple-choice", created: "2023-05-15" },
-      { id: 2, title: "Psalms Overview", questions: 15, type: "true-false", created: "2023-06-02" },
-      { id: 3, title: "Genesis Chapter 1", questions: 5, type: "fill-in-blanks", created: "2023-06-10" },
-    ];
-    
     const fetchQuizzes = async () => {
       try {
         const aiQuizzes = await getSavedGeneratedQuizzes();
@@ -53,7 +48,7 @@ function SavedQuizzes() {
       {generatedQuizzes.length > 0 && (
         <>
           <h3 className="text-lg font-medium flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" />
+            <Sparkle className="h-4 w-4 text-primary" />
             AI Generated Quizzes
           </h3>
           
