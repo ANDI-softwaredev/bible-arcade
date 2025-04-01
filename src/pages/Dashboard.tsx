@@ -8,6 +8,7 @@ import { StudyCard } from "@/components/ui/study-card";
 import { ProgressChart } from "@/components/progress-chart";
 import { LearningPlanGenerator } from "@/components/learning-plan-generator";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { 
   calculateOverallProgress, 
   calculateTestamentProgress,
@@ -16,7 +17,7 @@ import {
 } from "@/services/bible-api";
 
 const Dashboard = () => {
-  const [userName, setUserName] = useState("Samuel");
+  const { user, profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [progressData, setProgressData] = useState([]);
   const [studyStreak, setStudyStreak] = useState(0);
@@ -193,6 +194,9 @@ const Dashboard = () => {
       </Layout>
     );
   }
+  
+  // Get the user's name for greeting
+  const userName = profile?.full_name || user?.email?.split('@')[0] || "Friend";
   
   return (
     <Layout>
