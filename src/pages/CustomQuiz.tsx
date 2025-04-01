@@ -532,15 +532,10 @@ function CustomQuiz() {
         </div>
         
         <Tabs defaultValue="create" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="create">
               <Plus className="h-4 w-4 mr-2" />
               Create New
-            </TabsTrigger>
-            <TabsTrigger value="text-to-quiz">
-              <PenTool className="h-4 w-4 mr-2" />
-              Text to Quiz
-              <Badge className="ml-2 bg-primary" variant="secondary">New</Badge>
             </TabsTrigger>
             <TabsTrigger value="saved">
               <FileText className="h-4 w-4 mr-2" />
@@ -557,9 +552,6 @@ function CustomQuiz() {
           </TabsList>
           <TabsContent value="create" className="mt-6">
             <QuizCreator />
-          </TabsContent>
-          <TabsContent value="text-to-quiz" className="mt-6">
-            <TextToQuizGenerator />
           </TabsContent>
           <TabsContent value="saved" className="mt-6">
             <SavedQuizzes />
