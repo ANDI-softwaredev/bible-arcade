@@ -72,14 +72,16 @@ export function TextToQuizGenerator() {
         ? ["what", "who", "where", "when", "why", "how"] 
         : [questionType];
       
+      const numQuestionsInt = parseInt(numQuestions, 10);
+      
       if (file) {
         questions = await generateQAPairsFromPDF(file, {
-          numQuestions: parseInt(numQuestions),
+          numQuestions: numQuestionsInt,
           questionTypes
         });
       } else {
         questions = await generateQAPairsFromText(content, {
-          numQuestions: parseInt(numQuestions),
+          numQuestions: numQuestionsInt,
           questionTypes
         });
       }

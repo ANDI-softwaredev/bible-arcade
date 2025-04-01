@@ -37,6 +37,10 @@ export async function generateQAPairsFromText(
       throw new Error(`Failed to generate QA pairs: ${error.message}`);
     }
     
+    if (!data) {
+      throw new Error("No data returned from QA generation");
+    }
+    
     return data as QAPair[];
   } catch (error) {
     console.error("Error in generateQAPairsFromText:", error);
@@ -86,11 +90,17 @@ export async function generateQAPairsFromPDF(
     });
     
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to generate QA pairs: ${errorText}`);
+      const errorData = await response.json().catch(() => null);
+      const errorMessage = errorData?.error || await response.text() || "Unknown error";
+      throw new Error(`Failed to generate QA pairs: ${errorMessage}`);
     }
     
     const data = await response.json();
+    
+    if (!data) {
+      throw new Error("No data returned from QA generation");
+    }
+    
     return data as QAPair[];
   } catch (error) {
     console.error("Error in generateQAPairsFromPDF:", error);

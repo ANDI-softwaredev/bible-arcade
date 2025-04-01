@@ -37,7 +37,7 @@ async function extractTextFromPDF(fileData: string): Promise<string> {
 
 // Generate QA pairs using OpenAI
 async function generateQAPairs(
-  content: string, 
+  textContent: string, 
   numQuestions: number = 5,
   questionTypes: string[] = ["what", "who", "where", "when", "why", "how"]
 ): Promise<GeneratedQA[]> {
@@ -50,7 +50,7 @@ async function generateQAPairs(
     Please generate ${numQuestions} question and answer pairs based on the following content. 
     Focus on creating questions of these types: ${questionTypes.join(", ")}.
     
-    Content: """${content}"""
+    Content: """${textContent}"""
     
     Format your response as a valid JSON array, with each object having 'question' and 'answer' fields.
     For example: [{"question": "What is the main topic?", "answer": "The main topic is..."}]
