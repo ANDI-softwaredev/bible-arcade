@@ -1,6 +1,12 @@
 # Welcome to my Bible Quiz Application
 
 ## Project info
+An application to equip the Adventist Youth in their Bible Quiz endeavours. 
+-Track your reading progress
+-Generate practise questions with the help of AI. Just copy and paste or upload pdf to watch the magic
+-Get personalized study plans based on your progress
+-Practise speed answering with our timed quizzes and get instant feedback
+-Store your practise material safely 
 
 **App URL**: https://bible-arcade.netlify.app/
 
@@ -31,7 +37,9 @@ This project is built with .
 - shadcn-ui
 - Tailwind CSS
 
+## Who owns this project?
 
-## I want to use a custom domain - is that possible?
+Andile the MasterGuide
+gmail: andiledubet@gmail.com
+contact me to support the project! Many thanks <3
 
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
