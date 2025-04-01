@@ -353,8 +353,12 @@ function SavedQuizzes() {
     ];
     
     const fetchQuizzes = async () => {
-      const aiQuizzes = await getSavedGeneratedQuizzes();
-      setGeneratedQuizzes(aiQuizzes);
+      try {
+        const aiQuizzes = await getSavedGeneratedQuizzes();
+        setGeneratedQuizzes(aiQuizzes);
+      } catch (error) {
+        console.error("Error fetching generated quizzes:", error);
+      }
     };
     
     fetchQuizzes();

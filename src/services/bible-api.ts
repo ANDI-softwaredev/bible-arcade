@@ -246,24 +246,23 @@ export const saveReadingProgress = async (book: string, chapter: number): Promis
       );
       
       // Also update the weekly progress in the bible database
-      // Import directly instead of using dynamic import with await
       dbUpdateReadingProgress(5); // Add 5% progress for each chapter read
       return;
     }
 
     // Check if this chapter is already in the progress
     const { data: existingProgress } = await supabase
-      .from("reading_progress")
+      .from('reading_progress')
       .select("*")
       .eq("user_id", user.id)
       .eq("book", book)
       .eq("chapter", chapter)
-      .single();
+      .maybeSingle();
 
     if (existingProgress) {
       // Update existing entry
       await supabase
-        .from("reading_progress")
+        .from('reading_progress')
         .update({
           last_read: new Date().toISOString(),
           completed: true
@@ -271,7 +270,7 @@ export const saveReadingProgress = async (book: string, chapter: number): Promis
         .eq("id", existingProgress.id);
     } else {
       // Add new entry
-      await supabase.from("reading_progress").insert({
+      await supabase.from('reading_progress').insert({
         user_id: user.id,
         book,
         chapter,
@@ -300,7 +299,7 @@ export const getAllReadingProgress = async (): Promise<ReadingProgress[]> => {
     }
 
     const { data } = await supabase
-      .from("reading_progress")
+      .from('reading_progress')
       .select("*")
       .eq("user_id", user.id);
 
@@ -332,32 +331,42 @@ export const getBookReadingProgress = async (book: string): Promise<ReadingProgr
 
 // Calculate overall Bible reading progress percentage
 export const calculateOverallProgress = async (): Promise<number> => {
-  const allProgress = await getAllReadingProgress();
-  
-  // Simplified calculation - in a real app would account for actual number of chapters
-  // Assumes approximately 1189 chapters in the Bible (66 books)
-  const totalChapters = 1189;
-  const completedChapters = allProgress.filter(p => p.completed).length;
-  
-  return Math.round((completedChapters / totalChapters) * 100);
+  try {
+    const allProgress = await getAllReadingProgress();
+    
+    // Simplified calculation - in a real app would account for actual number of chapters
+    // Assumes approximately 1189 chapters in the Bible (66 books)
+    const totalChapters = 1189;
+    const completedChapters = allProgress.filter(p => p.completed).length;
+    
+    return Math.round((completedChapters / totalChapters) * 100);
+  } catch (error) {
+    console.error("Error calculating overall progress:", error);
+    return 0;
+  }
 };
 
 // Calculate testament reading progress
 export const calculateTestamentProgress = async (testament: "OT" | "NT"): Promise<number> => {
-  const allProgress = await getAllReadingProgress();
-  const oldTestamentBooks = ["Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy"]; // Add all OT books
-  
-  // Simplified check - in a real app would have complete book lists
-  const isOldTestament = (book: string) => oldTestamentBooks.includes(book);
-  
-  const relevantProgress = allProgress.filter(p => 
-    testament === "OT" ? isOldTestament(p.book) : !isOldTestament(p.book)
-  );
-  
-  const totalChapters = testament === "OT" ? 929 : 260; // Approximate counts
-  const completedChapters = relevantProgress.filter(p => p.completed).length;
-  
-  return Math.round((completedChapters / totalChapters) * 100);
+  try {
+    const allProgress = await getAllReadingProgress();
+    const oldTestamentBooks = ["Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy"]; // Add all OT books
+    
+    // Simplified check - in a real app would have complete book lists
+    const isOldTestament = (book: string) => oldTestamentBooks.includes(book);
+    
+    const relevantProgress = allProgress.filter(p => 
+      testament === "OT" ? isOldTestament(p.book) : !isOldTestament(p.book)
+    );
+    
+    const totalChapters = testament === "OT" ? 929 : 260; // Approximate counts
+    const completedChapters = relevantProgress.filter(p => p.completed).length;
+    
+    return Math.round((completedChapters / totalChapters) * 100);
+  } catch (error) {
+    console.error("Error calculating testament progress:", error);
+    return 0;
+  }
 };
 
 // Save journal entries for chapters
@@ -407,17 +416,17 @@ export const saveChapterJournal = async (book: string, chapter: number, text: st
 
     // Check if this chapter already has a journal entry
     const { data: existingJournal } = await supabase
-      .from("journal_entries")
+      .from('journal_entries')
       .select("*")
       .eq("user_id", user.id)
       .eq("book", book)
       .eq("chapter", chapter)
-      .single();
+      .maybeSingle();
     
     if (existingJournal) {
       // Update existing entry
       await supabase
-        .from("journal_entries")
+        .from('journal_entries')
         .update({
           text,
           last_updated: new Date().toISOString()
@@ -426,7 +435,7 @@ export const saveChapterJournal = async (book: string, chapter: number, text: st
     } else {
       // Add new entry
       await supabase
-        .from("journal_entries")
+        .from('journal_entries')
         .insert({
           user_id: user.id,
           book,
@@ -458,12 +467,12 @@ export const getChapterJournal = async (book: string, chapter: number): Promise<
     }
 
     const { data } = await supabase
-      .from("journal_entries")
+      .from('journal_entries')
       .select("text")
       .eq("user_id", user.id)
       .eq("book", book)
       .eq("chapter", chapter)
-      .single();
+      .maybeSingle();
     
     return data?.text || "";
   } catch (error) {
@@ -485,7 +494,7 @@ export const getAllJournalEntries = async (): Promise<JournalEntry[]> => {
     }
 
     const { data } = await supabase
-      .from("journal_entries")
+      .from('journal_entries')
       .select("*")
       .eq("user_id", user.id);
     
@@ -506,7 +515,12 @@ export const getAllJournalEntries = async (): Promise<JournalEntry[]> => {
 
 // Get completed books (books with at least one chapter marked as read)
 export const getCompletedBooks = async (): Promise<string[]> => {
-  const readingProgress = await getAllReadingProgress();
-  const completedBooks = new Set(readingProgress.map(progress => progress.book));
-  return Array.from(completedBooks);
+  try {
+    const readingProgress = await getAllReadingProgress();
+    const completedBooks = new Set(readingProgress.map(progress => progress.book));
+    return Array.from(completedBooks);
+  } catch (error) {
+    console.error("Error getting completed books:", error);
+    return [];
+  }
 };

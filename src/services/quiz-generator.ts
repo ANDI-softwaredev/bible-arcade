@@ -1,3 +1,4 @@
+
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
 
@@ -111,7 +112,7 @@ export const saveGeneratedQuiz = async (quiz: GeneratedQuiz): Promise<void> => {
     }
 
     await supabase
-      .from("generated_quizzes")
+      .from('generated_quizzes')
       .insert({
         user_id: user.id,
         title: quiz.title,
@@ -135,7 +136,7 @@ export const getSavedGeneratedQuizzes = async (): Promise<GeneratedQuiz[]> => {
     }
 
     const { data } = await supabase
-      .from("generated_quizzes")
+      .from('generated_quizzes')
       .select("*")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
@@ -146,7 +147,7 @@ export const getSavedGeneratedQuizzes = async (): Promise<GeneratedQuiz[]> => {
     return data.map(item => ({
       id: item.id,
       title: item.title,
-      questions: item.questions,
+      questions: item.questions as QuizQuestion[],
       timestamp: item.created_at
     }));
   } catch (error) {
@@ -154,15 +155,6 @@ export const getSavedGeneratedQuizzes = async (): Promise<GeneratedQuiz[]> => {
     return [];
   }
 };
-
-export interface QuizResult {
-  quizId: string;
-  score: number;
-  timeSpent: number;
-  correctAnswers: number;
-  totalQuestions: number;
-  timeBonus: number;
-}
 
 export const saveQuizResult = async (result: QuizResult): Promise<void> => {
   try {
@@ -175,7 +167,7 @@ export const saveQuizResult = async (result: QuizResult): Promise<void> => {
     }
 
     await supabase
-      .from("quiz_results")
+      .from('quiz_results')
       .insert({
         user_id: user.id,
         quiz_id: result.quizId,

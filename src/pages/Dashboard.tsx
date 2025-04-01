@@ -34,11 +34,12 @@ const Dashboard = () => {
     const fetchUserData = async () => {
       try {
         // Calculate Bible reading progress
-        const overall = calculateOverallProgress();
-        const oldTestament = calculateTestamentProgress("OT");
-        const newTestament = calculateTestamentProgress("NT");
-        const chaptersRead = getAllReadingProgress().length;
-        const completedBooks = getCompletedBooks().length;
+        const overall = await calculateOverallProgress();
+        const oldTestament = await calculateTestamentProgress("OT");
+        const newTestament = await calculateTestamentProgress("NT");
+        const allProgress = await getAllReadingProgress();
+        const completedBooks = await getCompletedBooks();
+        const chaptersRead = allProgress.length;
         
         setBibleProgress({
           overall,
@@ -47,10 +48,9 @@ const Dashboard = () => {
           chaptersRead
         });
         
-        setCompletedStudies(completedBooks);
+        setCompletedStudies(completedBooks.length);
         
         // Calculate study streak
-        const allProgress = getAllReadingProgress();
         const streak = calculateStudyStreak(allProgress);
         setStudyStreak(streak);
         
