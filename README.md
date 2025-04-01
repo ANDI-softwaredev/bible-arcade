@@ -39,7 +39,7 @@ This project is built with .
 
 ## Who owns this project?
 
-Andile the MasterGuide
-gmail: andiledubet@gmail.com
-contact me to support the project! Many thanks <3
+- Andile the MasterGuide
+- gmail: andiledubet@gmail.com
+- contact me to support the project! Many thanks <3
 
