@@ -2,11 +2,11 @@
 
 ## Project info
 An application to equip the Adventist Youth in their Bible Quiz endeavours. 
--Track your reading progress
--Generate practise questions with the help of AI. Just copy and paste or upload pdf to watch the magic
--Get personalized study plans based on your progress
--Practise speed answering with our timed quizzes and get instant feedback
--Store your practise material safely 
+- Track your reading progress
+- Generate practise questions with the help of AI. Just copy and paste or upload pdf to watch the magic
+- Get personalized study plans based on your progress
+- Practise speed answering with our timed quizzes and get instant feedback
+- Store your practise material safely 
 
 **App URL**: https://bible-arcade.netlify.app/
 
