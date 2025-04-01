@@ -9,57 +9,6 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      generated_quizzes: {
-        Row: {
-          created_at: string
-          id: string
-          questions: Json
-          title: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          questions: Json
-          title: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          questions?: Json
-          title?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      journal_entries: {
-        Row: {
-          book: string
-          chapter: number
-          id: string
-          last_updated: string
-          text: string
-          user_id: string
-        }
-        Insert: {
-          book: string
-          chapter: number
-          id?: string
-          last_updated?: string
-          text: string
-          user_id: string
-        }
-        Update: {
-          book?: string
-          chapter?: number
-          id?: string
-          last_updated?: string
-          text?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -81,77 +30,6 @@ export type Database = {
           full_name?: string | null
           id?: string
           updated_at?: string
-        }
-        Relationships: []
-      }
-      quiz_results: {
-        Row: {
-          completed_at: string
-          correct_answers: number
-          id: string
-          quiz_id: string | null
-          score: number
-          time_bonus: number | null
-          time_spent: number | null
-          total_questions: number
-          user_id: string
-        }
-        Insert: {
-          completed_at?: string
-          correct_answers: number
-          id?: string
-          quiz_id?: string | null
-          score: number
-          time_bonus?: number | null
-          time_spent?: number | null
-          total_questions: number
-          user_id: string
-        }
-        Update: {
-          completed_at?: string
-          correct_answers?: number
-          id?: string
-          quiz_id?: string | null
-          score?: number
-          time_bonus?: number | null
-          time_spent?: number | null
-          total_questions?: number
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "quiz_results_quiz_id_fkey"
-            columns: ["quiz_id"]
-            isOneToOne: false
-            referencedRelation: "generated_quizzes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      reading_progress: {
-        Row: {
-          book: string
-          chapter: number
-          completed: boolean
-          id: string
-          last_read: string
-          user_id: string
-        }
-        Insert: {
-          book: string
-          chapter: number
-          completed?: boolean
-          id?: string
-          last_read?: string
-          user_id: string
-        }
-        Update: {
-          book?: string
-          chapter?: number
-          completed?: boolean
-          id?: string
-          last_read?: string
-          user_id?: string
         }
         Relationships: []
       }
