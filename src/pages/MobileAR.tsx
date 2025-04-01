@@ -53,7 +53,7 @@ function MobileAR() {
                 Explore biblical content in augmented reality
               </p>
             </div>
-            <Badge className="bg-indigo-600 hover:bg-indigo-700 py-1 px-3 text-xs uppercase">New Feature</Badge>
+            <Badge className="bg-indigo-600 hover:bg-indigo-700 py-1 px-3 text-xs uppercase">Fun Feature</Badge>
           </div>
           
           <div className="p-6 rounded-lg glass-card backdrop-blur-xl border border-white/20 shadow-xl">
@@ -61,7 +61,7 @@ function MobileAR() {
               <div className="md:w-2/3">
                 <h2 className="text-2xl font-bold mb-4 text-white flex items-center">
                   <Smartphone className="h-6 w-6 mr-3 text-indigo-300" />
-                  Connect Your Mobile Device
+                  Mobile Device + Markers = Magic!
                 </h2>
                 <p className="text-indigo-100 mb-4">
                   Access powerful augmented reality features directly from your mobile device.
@@ -71,7 +71,7 @@ function MobileAR() {
                 <div className="space-y-2">
                   <div className="flex items-center text-indigo-200">
                     <Zap className="h-5 w-5 mr-2 text-indigo-400" />
-                    <span>Instant connection with your Biblico account</span>
+                    <span>Instant connection with your Bible ARcade account</span>
                   </div>
                   <div className="flex items-center text-indigo-200">
                     <Sparkles className="h-5 w-5 mr-2 text-indigo-400" />
@@ -120,7 +120,7 @@ function MobileAR() {
                 <CardFooter>
                   <Button variant="secondary" size="sm" className="w-full bg-indigo-900/50 border border-indigo-500/30 hover:bg-indigo-800/60 text-white">
                     <Sparkles className="h-4 w-4 mr-2" />
-                    Launch Experience
+                    <a href="https://githubcom">Launch Experience</a>
                   </Button>
                 </CardFooter>
               </Card>
@@ -136,7 +136,7 @@ function MobileAR() {
                 </div>
                 <h4 className="text-lg font-medium text-white">Download App</h4>
                 <p className="text-indigo-200 text-sm">
-                  Get the Biblico AR app from your device's app store
+                  Get the Bible ARcade app from your device's app store
                 </p>
               </div>
               <div className="space-y-2">
