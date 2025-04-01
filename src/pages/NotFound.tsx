@@ -28,7 +28,7 @@ const NotFound = () => {
         </div>
         <h1 className="text-4xl font-bold mb-4">404</h1>
         <p className="text-xl text-muted-foreground mb-6">
-          We couldn't find the page you're looking for
+          Oops you caught us! Andile's working on it!
         </p>
         <Button asChild className="w-full sm:w-auto">
           <a href="/">Return to Home</a>
