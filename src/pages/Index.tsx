@@ -24,7 +24,7 @@ const features = [
   {
     icon: <BookOpen className="h-6 w-6 text-primary" />,
     title: "Bible Study",
-    description: "Access comprehensive study materials for every book of the Bible, with in-depth commentaries."
+    description: "Access comprehensive study materials for every book of the Bible, journal and keep track of your reading progress"
   },
   {
     icon: <BarChart2 className="h-6 w-6 text-primary" />,
@@ -152,7 +152,7 @@ const Index = () => {
             className="mt-20 relative max-w-5xl mx-auto rounded-2xl overflow-hidden glass-card border border-white/10"
           >
             <img 
-              src="https://images.unsplash.com/photo-1606820854416-439b3305ff39?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2700&q=90" 
+              src="https://scontent-jnb2-1.xx.fbcdn.net/v/t39.30808-6/487409189_1071419195015529_7207815291547149919_n.jpg?_nc_cat=109&ccb=1-7&_nc_sid=127cfc&_nc_ohc=qkomZn1JDYsQ7kNvgGeK9Kn&_nc_oc=Adkk7aM17l61x0oLNFCvKUvdxOskng00wPqrjME61p5_H9UdX-3-OCqu1xk2RiK6ukQ&_nc_zt=23&_nc_ht=scontent-jnb2-1.xx&_nc_gid=DT0Kil35Yknp39bx1kXlfA&oh=00_AYEZ4Bo3p7Icz7kke9rQkJRqABnvGevdde0iFdf2es1ARA&oe=67F1B2B2" 
               alt="Dashboard Preview" 
               className="w-full shadow-xl rounded-xl"
             />
