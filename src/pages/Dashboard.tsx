@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { BookOpen, Calendar, Clock, BookMarked, BarChart2 } from "lucide-react";
+import { BookOpen, Calendar, Clock, BookMarked, BarChart2, Loader2 } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { StatCard } from "@/components/ui/stat-card";
 import { ProgressCard } from "@/components/ui/progress-card";
@@ -14,9 +14,10 @@ import {
   getAllReadingProgress,
   getCompletedBooks
 } from "@/services/bible-api";
+import { supabase } from "@/integrations/supabase/client";
 
 const Dashboard = () => {
-  const [userName, setUserName] = useState("Samuel");
+  const [userName, setUserName] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [progressData, setProgressData] = useState([]);
   const [studyStreak, setStudyStreak] = useState(0);
@@ -29,16 +30,56 @@ const Dashboard = () => {
     chaptersRead: 0
   });
   
+  // Check if user is authenticated
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  
+  useEffect(() => {
+    // Check authentication status
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setIsAuthenticated(!!session);
+      
+      if (session?.user) {
+        // Fetch user profile if authenticated
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', session.user.id)
+          .single();
+          
+        if (profile?.full_name) {
+          setUserName(profile.full_name.split(' ')[0] || "Friend");
+        } else {
+          setUserName(session.user.email?.split('@')[0] || "Friend");
+        }
+      }
+    };
+    
+    checkAuth();
+    
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setIsAuthenticated(!!session);
+    });
+    
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+  
   useEffect(() => {
     // Load user data and progress statistics
     const fetchUserData = async () => {
       try {
+        if (isAuthenticated === null) return; // Wait for auth check
+        
         // Calculate Bible reading progress
-        const overall = calculateOverallProgress();
-        const oldTestament = calculateTestamentProgress("OT");
-        const newTestament = calculateTestamentProgress("NT");
-        const chaptersRead = getAllReadingProgress().length;
-        const completedBooks = getCompletedBooks().length;
+        const overall = await calculateOverallProgress();
+        const oldTestament = await calculateTestamentProgress("OT");
+        const newTestament = await calculateTestamentProgress("NT");
+        const readingProgress = await getAllReadingProgress();
+        const chaptersRead = readingProgress.length;
+        const completedBooks = (await getCompletedBooks()).length;
         
         setBibleProgress({
           overall,
@@ -50,18 +91,17 @@ const Dashboard = () => {
         setCompletedStudies(completedBooks);
         
         // Calculate study streak
-        const allProgress = getAllReadingProgress();
-        const streak = calculateStudyStreak(allProgress);
+        const streak = calculateStudyStreak(readingProgress);
         setStudyStreak(streak);
         
         // Calculate weekly reading hours (approximate based on completed chapters)
         // Assuming average reading time of 10 minutes per chapter
-        const recentReadings = getRecentReadings(allProgress, 7); // last 7 days
+        const recentReadings = getRecentReadings(readingProgress, 7); // last 7 days
         const weeklyHours = (recentReadings.length * 10 / 60).toFixed(1);
         setWeeklyReading(parseFloat(weeklyHours));
         
         // Generate weekly progress data for chart
-        const chartData = generateWeeklyProgressData(allProgress);
+        const chartData = generateWeeklyProgressData(readingProgress);
         setProgressData(chartData);
         
         setLoading(false);
@@ -76,8 +116,10 @@ const Dashboard = () => {
       }
     };
     
-    fetchUserData();
-  }, []);
+    if (isAuthenticated !== null) {
+      fetchUserData();
+    }
+  }, [isAuthenticated]);
   
   // Function to calculate study streak based on reading progress
   const calculateStudyStreak = (progress) => {
@@ -187,8 +229,8 @@ const Dashboard = () => {
   if (loading) {
     return (
       <Layout>
-        <div className="pt-8 sm:pt-12">
-          <h1 className="text-3xl font-bold">Loading dashboard...</h1>
+        <div className="pt-8 sm:pt-12 flex items-center justify-center min-h-[50vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       </Layout>
     );
@@ -199,10 +241,16 @@ const Dashboard = () => {
       <div className="pt-8 sm:pt-12">
         <header className="mb-8 sm:mb-12">
           <div className="pill mb-3 inline-block">Dashboard</div>
-          <h1 className="text-3xl font-bold">Good {getCurrentTime()}, {userName}</h1>
+          <h1 className="text-3xl font-bold">Good {getCurrentTime()}, {userName || "Friend"}</h1>
           <p className="text-muted-foreground mt-2">
             Your spiritual journey continues. Here's your progress so far.
           </p>
+          
+          {isAuthenticated === false && (
+            <div className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-yellow-700 dark:text-yellow-400">
+              <p>Sign in to save your progress and personalize your dashboard.</p>
+            </div>
+          )}
         </header>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

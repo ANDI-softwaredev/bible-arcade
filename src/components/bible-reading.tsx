@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import { ChevronLeft, ChevronRight, BookOpen, CheckCircle, Save } from "lucide-react";
+import { ChevronLeft, ChevronRight, BookOpen, CheckCircle, Save, Loader2 } from "lucide-react";
 import { bibleBooks } from "@/data/bible-database";
 import { 
   getAllBooks, 
@@ -24,6 +24,7 @@ import {
 } from "@/services/bible-api";
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
+import { supabase } from "@/integrations/supabase/client";
 
 interface BibleReadingProps {
   initialBook?: string;
@@ -43,7 +44,31 @@ export function BibleReading({
   const [allBooks, setAllBooks] = useState<BibleAPIBook[]>([]);
   const [readingProgress, setReadingProgress] = useState<Record<string, boolean>>({});
   const [journalText, setJournalText] = useState("");
+  const [savingJournal, setSavingJournal] = useState(false);
+  const [markingAsRead, setMarkingAsRead] = useState(false);
   const { toast } = useToast();
+  
+  // Check if user is authenticated
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  
+  useEffect(() => {
+    // Check authentication status
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setIsAuthenticated(!!session);
+    };
+    
+    checkAuth();
+    
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setIsAuthenticated(!!session);
+    });
+    
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
   
   // Load all books
   useEffect(() => {
@@ -77,19 +102,29 @@ export function BibleReading({
     loadBooks();
     
     // Load reading progress
-    const progress = getAllReadingProgress();
-    const progressMap: Record<string, boolean> = {};
+    const loadReadingProgress = async () => {
+      if (isAuthenticated === null) return; // Wait for auth check
+      
+      const progress = await getAllReadingProgress();
+      const progressMap: Record<string, boolean> = {};
+      
+      progress.forEach(p => {
+        progressMap[`${p.book}-${p.chapter}`] = p.completed;
+      });
+      
+      setReadingProgress(progressMap);
+    };
     
-    progress.forEach(p => {
-      progressMap[`${p.book}-${p.chapter}`] = p.completed;
-    });
-    
-    setReadingProgress(progressMap);
-  }, []);
+    if (isAuthenticated !== null) {
+      loadReadingProgress();
+    }
+  }, [isAuthenticated]);
   
   // Load chapter data and journal when book or chapter changes
   useEffect(() => {
     const loadChapterJournal = async () => {
+      if (isAuthenticated === null) return; // Wait for auth check
+      
       setLoading(true);
       
       try {
@@ -119,9 +154,11 @@ export function BibleReading({
           setChapterCount(chapterCounts[selectedBook] || 1);
         }
         
-        // Load journal text for this chapter
-        const journal = getChapterJournal(selectedBook, selectedChapter);
-        setJournalText(journal || "");
+        // Load journal text for this chapter if authenticated
+        if (isAuthenticated) {
+          const journal = await getChapterJournal(selectedBook, selectedChapter);
+          setJournalText(journal || "");
+        }
       } catch (error) {
         console.error("Error loading chapter journal:", error);
       } finally {
@@ -129,30 +166,52 @@ export function BibleReading({
       }
     };
     
-    if (allBooks.length > 0 || selectedBook) {
+    if (allBooks.length > 0 && isAuthenticated !== null) {
       loadChapterJournal();
     }
-  }, [selectedBook, selectedChapter, allBooks]);
+  }, [selectedBook, selectedChapter, allBooks, isAuthenticated]);
   
   // Mark chapter as read
-  const markAsRead = (checked: boolean) => {
-    if (checked) {
-      saveReadingProgress(selectedBook, selectedChapter);
-      
-      // Update local state
-      setReadingProgress({
-        ...readingProgress,
-        [`${selectedBook}-${selectedChapter}`]: true
-      });
-      
+  const markAsRead = async (checked: boolean) => {
+    if (!isAuthenticated) {
       toast({
-        title: "Chapter Completed!",
-        description: `You've marked ${selectedBook} ${selectedChapter} as read.`,
+        title: "Authentication required",
+        description: "Please sign in to save your reading progress.",
+        variant: "destructive"
       });
+      return;
+    }
+    
+    if (checked) {
+      setMarkingAsRead(true);
       
-      // Call callback if provided
-      if (onReadComplete) {
-        onReadComplete(selectedBook, selectedChapter);
+      try {
+        await saveReadingProgress(selectedBook, selectedChapter);
+        
+        // Update local state
+        setReadingProgress({
+          ...readingProgress,
+          [`${selectedBook}-${selectedChapter}`]: true
+        });
+        
+        toast({
+          title: "Chapter Completed!",
+          description: `You've marked ${selectedBook} ${selectedChapter} as read.`,
+        });
+        
+        // Call callback if provided
+        if (onReadComplete) {
+          onReadComplete(selectedBook, selectedChapter);
+        }
+      } catch (error) {
+        console.error("Error marking chapter as read:", error);
+        toast({
+          title: "Error",
+          description: "Failed to mark chapter as read. Please try again.",
+          variant: "destructive"
+        });
+      } finally {
+        setMarkingAsRead(false);
       }
     } else {
       // Handle unmarking as read (optional)
@@ -164,12 +223,35 @@ export function BibleReading({
     }
   };
   
-  const saveJournal = () => {
-    saveChapterJournal(selectedBook, selectedChapter, journalText);
-    toast({
-      title: "Journal Saved",
-      description: "Your notes for this chapter have been saved.",
-    });
+  const saveJournal = async () => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to save your journal entries.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setSavingJournal(true);
+    
+    try {
+      await saveChapterJournal(selectedBook, selectedChapter, journalText);
+      
+      toast({
+        title: "Journal Saved",
+        description: "Your notes for this chapter have been saved.",
+      });
+    } catch (error) {
+      console.error("Error saving journal:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save journal. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setSavingJournal(false);
+    }
   };
   
   // Navigation functions
@@ -294,18 +376,26 @@ export function BibleReading({
               {selectedBook} {selectedChapter}
             </div>
             
+            {isAuthenticated === false && (
+              <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-yellow-700 dark:text-yellow-400">
+                <p>Please sign in to track your reading progress and save journal entries.</p>
+              </div>
+            )}
+            
             <div className="space-y-4">
               <div className="flex items-center space-x-2">
                 <Checkbox 
                   id="chapter-read" 
                   checked={isChapterRead}
                   onCheckedChange={markAsRead}
+                  disabled={!isAuthenticated || markingAsRead}
                 />
                 <Label
                   htmlFor="chapter-read"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center"
                 >
                   I have read this chapter
+                  {markingAsRead && <Loader2 className="ml-2 h-3 w-3 animate-spin" />}
                 </Label>
               </div>
               
@@ -319,12 +409,14 @@ export function BibleReading({
                   className="min-h-[200px]"
                   value={journalText}
                   onChange={(e) => setJournalText(e.target.value)}
+                  disabled={!isAuthenticated}
                 />
                 <Button 
                   onClick={saveJournal} 
                   className="mt-2 flex items-center gap-2"
+                  disabled={!isAuthenticated || savingJournal}
                 >
-                  <Save className="h-4 w-4" />
+                  {savingJournal ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                   Save Journal
                 </Button>
               </div>
