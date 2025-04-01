@@ -1,8 +1,9 @@
+
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
-import { remixVitePlugin } from "@remix-run/dev"; // Import the Remix Vite plugin
+import { vitePlugin as remixVitePlugin } from "@remix-run/dev"; // Fix the import name
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -12,7 +13,7 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
-    remixVitePlugin(), // Add the Remix Vite plugin here
+    remixVitePlugin(), // Use the correctly named plugin
     mode === 'development' && componentTagger(),
   ].filter(Boolean),
   resolve: {

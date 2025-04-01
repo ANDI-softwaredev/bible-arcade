@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Sparkles, Download, BookOpen, BookCheck, ChevronRight, Star, AlertCircle } from "lucide-react";
@@ -35,97 +34,95 @@ export function LearningPlanGenerator() {
   const { toast } = useToast();
   
   // Generate learning plan based on user data and quiz performance
-  const generateLearningPlan = () => {
+  const generateLearningPlan = async () => {
     setIsGenerating(true);
     
-    setTimeout(() => {
-      try {
-        // Get reading progress
-        const readingProgress = getAllReadingProgress();
-        const journalEntries = getAllJournalEntries();
-        
-        // Get completed books and chapters
-        const completedBookMap = new Map();
-        readingProgress.forEach(item => {
-          if (!completedBookMap.has(item.book)) {
-            completedBookMap.set(item.book, []);
-          }
-          completedBookMap.get(item.book).push(item.chapter);
-        });
-        
-        // Calculate strengths (books with most completed chapters)
-        const strengths: string[] = Array.from(completedBookMap.entries())
-          .sort((a, b) => b[1].length - a[1].length)
-          .slice(0, 3)
-          .map(([book]) => book);
-        
-        // Calculate weaknesses (books that haven't been started or have few completed chapters)
-        const allBooks = [...bibleBooks.oldTestament, ...bibleBooks.newTestament];
-        const weaknesses: string[] = allBooks
-          .filter(book => !completedBookMap.has(book) || completedBookMap.get(book).length < 2)
-          .slice(0, 3);
-        
-        // Get recommended books based on reading patterns and weaknesses
-        const recommendedBooks = weaknesses.map(book => {
-          return {
-            name: book,
-            reason: completedBookMap.has(book) 
-              ? "Continue your progress in this book" 
-              : "New book to expand your knowledge"
-          };
-        });
-        
-        // If user has journal entries, recommend related books
-        if (journalEntries.length > 0) {
-          const journaledBook = journalEntries[0].book;
-          if (!recommendedBooks.some(rec => rec.name === journaledBook)) {
-            recommendedBooks.push({
-              name: journaledBook,
-              reason: "Based on your journal reflections"
-            });
-          }
+    try {
+      // Get reading progress
+      const readingProgress = await getAllReadingProgress();
+      const journalEntries = await getAllJournalEntries();
+      
+      // Get completed books and chapters
+      const completedBookMap = new Map();
+      readingProgress.forEach(item => {
+        if (!completedBookMap.has(item.book)) {
+          completedBookMap.set(item.book, []);
         }
-        
-        // Calculate total completed chapters
-        const completedChapters = readingProgress.length;
-        
-        // Generate mock quiz scores (in a real app, would pull from actual quiz history)
-        const mockScores = [75, 82, 68, 90];
-        
-        // Create learning plan
-        const plan: LearningPlanData = {
-          username: "Samuel", // This should be dynamic based on the user
-          strengths: strengths.length > 0 ? strengths : ["Genesis", "Psalms", "John"],
-          weaknesses: weaknesses.length > 0 ? weaknesses : ["Revelation", "Ezekiel", "Leviticus"],
-          recommendedBooks: recommendedBooks.slice(0, 3),
-          completedChaptersCount: completedChapters,
-          totalChaptersGoal: completedChapters + 30, // Set a goal of 30 more chapters
-          quizScores: {
-            average: mockScores.reduce((sum, score) => sum + score, 0) / mockScores.length,
-            lastAttempts: mockScores
-          },
-          nextMilestone: {
-            description: "Complete 25% of the New Testament",
-            chaptersNeeded: 65 - completedChapters
-          }
+        completedBookMap.get(item.book).push(item.chapter);
+      });
+      
+      // Calculate strengths (books with most completed chapters)
+      const strengths: string[] = Array.from(completedBookMap.entries())
+        .sort((a, b) => b[1].length - a[1].length)
+        .slice(0, 3)
+        .map(([book]) => book);
+      
+      // Calculate weaknesses (books that haven't been started or have few completed chapters)
+      const allBooks = [...bibleBooks.oldTestament, ...bibleBooks.newTestament];
+      const weaknesses: string[] = allBooks
+        .filter(book => !completedBookMap.has(book) || completedBookMap.get(book).length < 2)
+        .slice(0, 3);
+      
+      // Get recommended books based on reading patterns and weaknesses
+      const recommendedBooks = weaknesses.map(book => {
+        return {
+          name: book,
+          reason: completedBookMap.has(book) 
+            ? "Continue your progress in this book" 
+            : "New book to expand your knowledge"
         };
-        
-        setLearningPlan(plan);
-        toast({
-          title: "Learning Plan Generated",
-          description: "Your personalized learning plan is ready!"
-        });
-      } catch (error) {
-        console.error("Error generating learning plan:", error);
-        toast({
-          title: "Error",
-          description: "Failed to generate your learning plan. Please try again.",
-          variant: "destructive"
-        });
-      } finally {
-        setIsGenerating(false);
+      });
+      
+      // If user has journal entries, recommend related books
+      if (journalEntries.length > 0) {
+        const journaledBook = journalEntries[0].book;
+        if (!recommendedBooks.some(rec => rec.name === journaledBook)) {
+          recommendedBooks.push({
+            name: journaledBook,
+            reason: "Based on your journal reflections"
+          });
+        }
       }
-    }, 1500);
+      
+      // Calculate total completed chapters
+      const completedChapters = readingProgress.length;
+      
+      // Generate mock quiz scores (in a real app, would pull from actual quiz history)
+      const mockScores = [75, 82, 68, 90];
+      
+      // Create learning plan
+      const plan: LearningPlanData = {
+        username: "Samuel", // This should be dynamic based on the user
+        strengths: strengths.length > 0 ? strengths : ["Genesis", "Psalms", "John"],
+        weaknesses: weaknesses.length > 0 ? weaknesses : ["Revelation", "Ezekiel", "Leviticus"],
+        recommendedBooks: recommendedBooks.slice(0, 3),
+        completedChaptersCount: completedChapters,
+        totalChaptersGoal: completedChapters + 30, // Set a goal of 30 more chapters
+        quizScores: {
+          average: mockScores.reduce((sum, score) => sum + score, 0) / mockScores.length,
+          lastAttempts: mockScores
+        },
+        nextMilestone: {
+          description: "Complete 25% of the New Testament",
+          chaptersNeeded: 65 - completedChapters
+        }
+      };
+      
+      setLearningPlan(plan);
+      toast({
+        title: "Learning Plan Generated",
+        description: "Your personalized learning plan is ready!"
+      });
+    } catch (error) {
+      console.error("Error generating learning plan:", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate your learning plan. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGenerating(false);
+    }
   };
   
   // Create a downloadable text version of the learning plan

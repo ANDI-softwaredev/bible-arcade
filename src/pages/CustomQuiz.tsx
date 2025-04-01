@@ -352,8 +352,12 @@ function SavedQuizzes() {
       { id: 3, title: "Genesis Chapter 1", questions: 5, type: "fill-in-blanks", created: "2023-06-10" },
     ];
     
-    const aiQuizzes = getSavedGeneratedQuizzes();
-    setGeneratedQuizzes(aiQuizzes);
+    const fetchQuizzes = async () => {
+      const aiQuizzes = await getSavedGeneratedQuizzes();
+      setGeneratedQuizzes(aiQuizzes);
+    };
+    
+    fetchQuizzes();
   }, []);
 
   return (

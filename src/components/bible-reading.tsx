@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   Select, 
@@ -47,10 +46,20 @@ export function BibleReading({
   
   // Load all books
   useEffect(() => {
-    const loadBooks = async () => {
+    const loadBooksAndProgress = async () => {
       try {
         const books = await getAllBooks();
         setAllBooks(books);
+        
+        // Load reading progress
+        const progress = await getAllReadingProgress();
+        const progressMap: Record<string, boolean> = {};
+        
+        progress.forEach(p => {
+          progressMap[`${p.book}-${p.chapter}`] = p.completed;
+        });
+        
+        setReadingProgress(progressMap);
       } catch (error) {
         console.error("Failed to load Bible books:", error);
         // Fallback to local book list if API fails
@@ -74,17 +83,7 @@ export function BibleReading({
       }
     };
     
-    loadBooks();
-    
-    // Load reading progress
-    const progress = getAllReadingProgress();
-    const progressMap: Record<string, boolean> = {};
-    
-    progress.forEach(p => {
-      progressMap[`${p.book}-${p.chapter}`] = p.completed;
-    });
-    
-    setReadingProgress(progressMap);
+    loadBooksAndProgress();
   }, []);
   
   // Load chapter data and journal when book or chapter changes
@@ -120,7 +119,7 @@ export function BibleReading({
         }
         
         // Load journal text for this chapter
-        const journal = getChapterJournal(selectedBook, selectedChapter);
+        const journal = await getChapterJournal(selectedBook, selectedChapter);
         setJournalText(journal || "");
       } catch (error) {
         console.error("Error loading chapter journal:", error);
@@ -135,9 +134,9 @@ export function BibleReading({
   }, [selectedBook, selectedChapter, allBooks]);
   
   // Mark chapter as read
-  const markAsRead = (checked: boolean) => {
+  const markAsRead = async (checked: boolean) => {
     if (checked) {
-      saveReadingProgress(selectedBook, selectedChapter);
+      await saveReadingProgress(selectedBook, selectedChapter);
       
       // Update local state
       setReadingProgress({
@@ -164,8 +163,8 @@ export function BibleReading({
     }
   };
   
-  const saveJournal = () => {
-    saveChapterJournal(selectedBook, selectedChapter, journalText);
+  const saveJournal = async () => {
+    await saveChapterJournal(selectedBook, selectedChapter, journalText);
     toast({
       title: "Journal Saved",
       description: "Your notes for this chapter have been saved.",

@@ -1,5 +1,7 @@
+
 import { BibleVerse, BibleChapter, getChapter as getLocalChapter } from "@/data/bible-rsv";
 import { updateReadingProgress as dbUpdateReadingProgress } from "@/data/bible-database";
+import { supabase } from "@/integrations/supabase/client";
 
 // API Configuration
 const API_KEY = "74ec65c32bccc3be8b1a835fc6f9e77d"; // Public API key for API.Bible
@@ -200,47 +202,85 @@ const getChapterFromLocalData = (
   return getLocalChapter(bookName, chapterNumber);
 };
 
-// Store reading progress in local storage
-export const saveReadingProgress = (book: string, chapter: number): void => {
+// Store reading progress in database
+export const saveReadingProgress = async (book: string, chapter: number): Promise<void> => {
   try {
-    // Get current progress data
-    const progressDataStr = localStorage.getItem("bible-reading-progress");
-    const progressData: ReadingProgress[] = progressDataStr
-      ? JSON.parse(progressDataStr)
-      : [];
-    
+    const { data: session } = await supabase.auth.getSession();
+    const user = session?.session?.user;
+
+    if (!user) {
+      // Fallback to localStorage if not authenticated
+      const progressDataStr = localStorage.getItem("bible-reading-progress");
+      const progressData: ReadingProgress[] = progressDataStr
+        ? JSON.parse(progressDataStr)
+        : [];
+      
+      // Check if this chapter is already in the progress
+      const existingProgressIndex = progressData.findIndex(
+        (p) => p.book === book && p.chapter === chapter
+      );
+      
+      const now = new Date().toISOString();
+      
+      if (existingProgressIndex >= 0) {
+        // Update existing entry
+        progressData[existingProgressIndex] = {
+          ...progressData[existingProgressIndex],
+          lastRead: now,
+          completed: true,
+        };
+      } else {
+        // Add new entry
+        progressData.push({
+          book,
+          chapter,
+          lastRead: now,
+          completed: true,
+        });
+      }
+      
+      // Save updated progress
+      localStorage.setItem(
+        "bible-reading-progress",
+        JSON.stringify(progressData)
+      );
+      
+      // Also update the weekly progress in the bible database
+      // Import directly instead of using dynamic import with await
+      dbUpdateReadingProgress(5); // Add 5% progress for each chapter read
+      return;
+    }
+
     // Check if this chapter is already in the progress
-    const existingProgressIndex = progressData.findIndex(
-      (p) => p.book === book && p.chapter === chapter
-    );
-    
-    const now = new Date().toISOString();
-    
-    if (existingProgressIndex >= 0) {
+    const { data: existingProgress } = await supabase
+      .from("reading_progress")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("book", book)
+      .eq("chapter", chapter)
+      .single();
+
+    if (existingProgress) {
       // Update existing entry
-      progressData[existingProgressIndex] = {
-        ...progressData[existingProgressIndex],
-        lastRead: now,
-        completed: true,
-      };
+      await supabase
+        .from("reading_progress")
+        .update({
+          last_read: new Date().toISOString(),
+          completed: true
+        })
+        .eq("id", existingProgress.id);
     } else {
       // Add new entry
-      progressData.push({
+      await supabase.from("reading_progress").insert({
+        user_id: user.id,
         book,
         chapter,
-        lastRead: now,
-        completed: true,
+        last_read: new Date().toISOString(),
+        completed: true
       });
     }
     
-    // Save updated progress
-    localStorage.setItem(
-      "bible-reading-progress",
-      JSON.stringify(progressData)
-    );
-    
     // Also update the weekly progress in the bible database
-    // Import directly instead of using dynamic import with await
     dbUpdateReadingProgress(5); // Add 5% progress for each chapter read
   } catch (error) {
     console.error("Error saving reading progress:", error);
@@ -248,10 +288,31 @@ export const saveReadingProgress = (book: string, chapter: number): void => {
 };
 
 // Get all reading progress
-export const getAllReadingProgress = (): ReadingProgress[] => {
+export const getAllReadingProgress = async (): Promise<ReadingProgress[]> => {
   try {
-    const progressDataStr = localStorage.getItem("bible-reading-progress");
-    return progressDataStr ? JSON.parse(progressDataStr) : [];
+    const { data: session } = await supabase.auth.getSession();
+    const user = session?.session?.user;
+
+    if (!user) {
+      // Fallback to localStorage if not authenticated
+      const progressDataStr = localStorage.getItem("bible-reading-progress");
+      return progressDataStr ? JSON.parse(progressDataStr) : [];
+    }
+
+    const { data } = await supabase
+      .from("reading_progress")
+      .select("*")
+      .eq("user_id", user.id);
+
+    if (!data) return [];
+
+    // Map to our ReadingProgress interface
+    return data.map(item => ({
+      book: item.book,
+      chapter: item.chapter,
+      lastRead: item.last_read,
+      completed: item.completed
+    }));
   } catch (error) {
     console.error("Error getting reading progress:", error);
     return [];
@@ -259,9 +320,9 @@ export const getAllReadingProgress = (): ReadingProgress[] => {
 };
 
 // Get reading progress for a specific book
-export const getBookReadingProgress = (book: string): ReadingProgress[] => {
+export const getBookReadingProgress = async (book: string): Promise<ReadingProgress[]> => {
   try {
-    const allProgress = getAllReadingProgress();
+    const allProgress = await getAllReadingProgress();
     return allProgress.filter((progress) => progress.book === book);
   } catch (error) {
     console.error("Error getting book reading progress:", error);
@@ -270,8 +331,8 @@ export const getBookReadingProgress = (book: string): ReadingProgress[] => {
 };
 
 // Calculate overall Bible reading progress percentage
-export const calculateOverallProgress = (): number => {
-  const allProgress = getAllReadingProgress();
+export const calculateOverallProgress = async (): Promise<number> => {
+  const allProgress = await getAllReadingProgress();
   
   // Simplified calculation - in a real app would account for actual number of chapters
   // Assumes approximately 1189 chapters in the Bible (66 books)
@@ -282,8 +343,8 @@ export const calculateOverallProgress = (): number => {
 };
 
 // Calculate testament reading progress
-export const calculateTestamentProgress = (testament: "OT" | "NT"): number => {
-  const allProgress = getAllReadingProgress();
+export const calculateTestamentProgress = async (testament: "OT" | "NT"): Promise<number> => {
+  const allProgress = await getAllReadingProgress();
   const oldTestamentBooks = ["Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy"]; // Add all OT books
   
   // Simplified check - in a real app would have complete book lists
@@ -300,58 +361,111 @@ export const calculateTestamentProgress = (testament: "OT" | "NT"): number => {
 };
 
 // Save journal entries for chapters
-export const saveChapterJournal = (book: string, chapter: number, text: string): void => {
+export const saveChapterJournal = async (book: string, chapter: number, text: string): Promise<void> => {
   try {
-    // Get current journal data
-    const journalDataStr = localStorage.getItem("bible-chapter-journals");
-    const journalData: JournalEntry[] = journalDataStr
-      ? JSON.parse(journalDataStr)
-      : [];
+    const { data: session } = await supabase.auth.getSession();
+    const user = session?.session?.user;
+
+    if (!user) {
+      // Fallback to localStorage if not authenticated
+      const journalDataStr = localStorage.getItem("bible-chapter-journals");
+      const journalData: JournalEntry[] = journalDataStr
+        ? JSON.parse(journalDataStr)
+        : [];
+      
+      // Check if this chapter already has a journal
+      const existingJournalIndex = journalData.findIndex(
+        (j) => j.book === book && j.chapter === chapter
+      );
+      
+      const now = new Date().toISOString();
+      
+      if (existingJournalIndex >= 0) {
+        // Update existing entry
+        journalData[existingJournalIndex] = {
+          ...journalData[existingJournalIndex],
+          text,
+          lastUpdated: now,
+        };
+      } else {
+        // Add new entry
+        journalData.push({
+          book,
+          chapter,
+          text,
+          lastUpdated: now,
+        });
+      }
+      
+      // Save updated journals
+      localStorage.setItem(
+        "bible-chapter-journals",
+        JSON.stringify(journalData)
+      );
+      return;
+    }
+
+    // Check if this chapter already has a journal entry
+    const { data: existingJournal } = await supabase
+      .from("journal_entries")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("book", book)
+      .eq("chapter", chapter)
+      .single();
     
-    // Check if this chapter already has a journal
-    const existingJournalIndex = journalData.findIndex(
-      (j) => j.book === book && j.chapter === chapter
-    );
-    
-    const now = new Date().toISOString();
-    
-    if (existingJournalIndex >= 0) {
+    if (existingJournal) {
       // Update existing entry
-      journalData[existingJournalIndex] = {
-        ...journalData[existingJournalIndex],
-        text,
-        lastUpdated: now,
-      };
+      await supabase
+        .from("journal_entries")
+        .update({
+          text,
+          last_updated: new Date().toISOString()
+        })
+        .eq("id", existingJournal.id);
     } else {
       // Add new entry
-      journalData.push({
-        book,
-        chapter,
-        text,
-        lastUpdated: now,
-      });
+      await supabase
+        .from("journal_entries")
+        .insert({
+          user_id: user.id,
+          book,
+          chapter,
+          text,
+          last_updated: new Date().toISOString()
+        });
     }
-    
-    // Save updated journals
-    localStorage.setItem(
-      "bible-chapter-journals",
-      JSON.stringify(journalData)
-    );
   } catch (error) {
     console.error("Error saving chapter journal:", error);
   }
 };
 
 // Get journal entry for a specific chapter
-export const getChapterJournal = (book: string, chapter: number): string => {
+export const getChapterJournal = async (book: string, chapter: number): Promise<string> => {
   try {
-    const journalDataStr = localStorage.getItem("bible-chapter-journals");
-    if (!journalDataStr) return "";
+    const { data: session } = await supabase.auth.getSession();
+    const user = session?.session?.user;
+
+    if (!user) {
+      // Fallback to localStorage if not authenticated
+      const journalDataStr = localStorage.getItem("bible-chapter-journals");
+      if (!journalDataStr) return "";
+      
+      const journalData: JournalEntry[] = JSON.parse(journalDataStr);
+      const entry = journalData.find(j => j.book === book && j.chapter === chapter);
+      
+      return entry ? entry.text : "";
+    }
+
+    const { data } = await supabase
+      .from("journal_entries")
+      .select("text")
+      .eq("user_id", user.id)
+      .eq("book", book)
+      .eq("chapter", chapter)
+      .single();
     
-    const journalData: JournalEntry[] = JSON.parse(journalDataStr);
-    const entry = journalData.find(j => j.book === book && j.chapter === chapter);
-    
-    return entry ? entry.text : "";
+    return data?.text || "";
   } catch (error) {
     console.error("Error getting chapter journal:", error);
     return "";
@@ -359,10 +473,31 @@ export const getChapterJournal = (book: string, chapter: number): string => {
 };
 
 // Get all journal entries
-export const getAllJournalEntries = (): JournalEntry[] => {
+export const getAllJournalEntries = async (): Promise<JournalEntry[]> => {
   try {
-    const journalDataStr = localStorage.getItem("bible-chapter-journals");
-    return journalDataStr ? JSON.parse(journalDataStr) : [];
+    const { data: session } = await supabase.auth.getSession();
+    const user = session?.session?.user;
+
+    if (!user) {
+      // Fallback to localStorage if not authenticated
+      const journalDataStr = localStorage.getItem("bible-chapter-journals");
+      return journalDataStr ? JSON.parse(journalDataStr) : [];
+    }
+
+    const { data } = await supabase
+      .from("journal_entries")
+      .select("*")
+      .eq("user_id", user.id);
+    
+    if (!data) return [];
+
+    // Map to our JournalEntry interface
+    return data.map(item => ({
+      book: item.book,
+      chapter: item.chapter,
+      text: item.text,
+      lastUpdated: item.last_updated
+    }));
   } catch (error) {
     console.error("Error getting journal entries:", error);
     return [];
@@ -370,8 +505,8 @@ export const getAllJournalEntries = (): JournalEntry[] => {
 };
 
 // Get completed books (books with at least one chapter marked as read)
-export const getCompletedBooks = (): string[] => {
-  const readingProgress = getAllReadingProgress();
+export const getCompletedBooks = async (): Promise<string[]> => {
+  const readingProgress = await getAllReadingProgress();
   const completedBooks = new Set(readingProgress.map(progress => progress.book));
   return Array.from(completedBooks);
 };

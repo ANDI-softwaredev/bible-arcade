@@ -37,84 +37,90 @@ const Progress = () => {
     newTestament: 0
   });
   const [bookCompletion, setBookCompletion] = useState<any[]>([]);
+  const [readingProgress, setReadingProgress] = useState<ReadingProgress[]>([]);
   
   useEffect(() => {
     setProgressData(timeFrame === "weekly" ? weeklyData : monthlyData);
     
-    const overall = calculateOverallProgress();
-    const oldTestament = calculateTestamentProgress("OT");
-    const newTestament = calculateTestamentProgress("NT");
-    
-    setBibleProgress({
-      overall,
-      oldTestament,
-      newTestament
-    });
-    
-    const readingProgress = getAllReadingProgress();
-    
-    const bookMap = new Map<string, {
-      totalRead: number;
-      lastRead: string;
-    }>();
-    
-    readingProgress.forEach(progress => {
-      if (!bookMap.has(progress.book)) {
-        bookMap.set(progress.book, {
-          totalRead: 0,
-          lastRead: progress.lastRead
-        });
-      }
+    const fetchData = async () => {
+      const overall = await calculateOverallProgress();
+      const oldTestament = await calculateTestamentProgress("OT");
+      const newTestament = await calculateTestamentProgress("NT");
       
-      const bookData = bookMap.get(progress.book)!;
-      bookData.totalRead += 1;
+      setBibleProgress({
+        overall,
+        oldTestament,
+        newTestament
+      });
       
-      const currentLastRead = new Date(bookData.lastRead);
-      const progressLastRead = new Date(progress.lastRead);
-      if (progressLastRead > currentLastRead) {
-        bookData.lastRead = progress.lastRead;
-      }
-    });
+      const progress = await getAllReadingProgress();
+      setReadingProgress(progress);
+      
+      const bookMap = new Map<string, {
+        totalRead: number;
+        lastRead: string;
+      }>();
+      
+      progress.forEach(progress => {
+        if (!bookMap.has(progress.book)) {
+          bookMap.set(progress.book, {
+            totalRead: 0,
+            lastRead: progress.lastRead
+          });
+        }
+        
+        const bookData = bookMap.get(progress.book)!;
+        bookData.totalRead += 1;
+        
+        const currentLastRead = new Date(bookData.lastRead);
+        const progressLastRead = new Date(progress.lastRead);
+        if (progressLastRead > currentLastRead) {
+          bookData.lastRead = progress.lastRead;
+        }
+      });
+      
+      const bookCompletionData = Array.from(bookMap.entries()).map(([book, data]) => {
+        const bookChapters: Record<string, number> = {
+          "Genesis": 50,
+          "Exodus": 40,
+          "Leviticus": 27,
+          "Numbers": 36,
+          "Deuteronomy": 34,
+          "Matthew": 28,
+          "Mark": 16,
+          "Luke": 24,
+          "John": 21,
+          "Acts": 28,
+          "Romans": 16,
+        };
+        
+        const chapters = bookChapters[book] || 30;
+        const progress = Math.min(Math.round((data.totalRead / chapters) * 100), 100);
+        
+        const lastReadDate = new Date(data.lastRead);
+        const now = new Date();
+        const diffDays = Math.floor((now.getTime() - lastReadDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        let lastRead = "Today";
+        if (diffDays === 1) lastRead = "Yesterday";
+        else if (diffDays > 1 && diffDays < 7) lastRead = `${diffDays} days ago`;
+        else if (diffDays >= 7 && diffDays < 30) lastRead = `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) > 1 ? 's' : ''} ago`;
+        else if (diffDays >= 30) lastRead = `${Math.floor(diffDays / 30)} month${Math.floor(diffDays / 30) > 1 ? 's' : ''} ago`;
+        
+        return {
+          name: book,
+          progress,
+          chapters,
+          lastRead
+        };
+      });
+      
+      bookCompletionData.sort((a, b) => b.progress - a.progress);
+      
+      setBookCompletion(bookCompletionData);
+    };
     
-    const bookCompletionData = Array.from(bookMap.entries()).map(([book, data]) => {
-      const bookChapters: Record<string, number> = {
-        "Genesis": 50,
-        "Exodus": 40,
-        "Leviticus": 27,
-        "Numbers": 36,
-        "Deuteronomy": 34,
-        "Matthew": 28,
-        "Mark": 16,
-        "Luke": 24,
-        "John": 21,
-        "Acts": 28,
-        "Romans": 16,
-      };
-      
-      const chapters = bookChapters[book] || 30;
-      const progress = Math.min(Math.round((data.totalRead / chapters) * 100), 100);
-      
-      const lastReadDate = new Date(data.lastRead);
-      const now = new Date();
-      const diffDays = Math.floor((now.getTime() - lastReadDate.getTime()) / (1000 * 60 * 60 * 24));
-      
-      let lastRead = "Today";
-      if (diffDays === 1) lastRead = "Yesterday";
-      else if (diffDays > 1 && diffDays < 7) lastRead = `${diffDays} days ago`;
-      else if (diffDays >= 7 && diffDays < 30) lastRead = `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) > 1 ? 's' : ''} ago`;
-      else if (diffDays >= 30) lastRead = `${Math.floor(diffDays / 30)} month${Math.floor(diffDays / 30) > 1 ? 's' : ''} ago`;
-      
-      return {
-        name: book,
-        progress,
-        chapters,
-        lastRead
-      };
-    });
-    
-    bookCompletionData.sort((a, b) => b.progress - a.progress);
-    
-    setBookCompletion(bookCompletionData);
+    fetchData();
   }, [timeFrame]);
   
   const bibleCompletion = [
@@ -328,7 +334,7 @@ const Progress = () => {
                 </div>
                 <h3 className="font-medium">Chapters Read</h3>
               </div>
-              <div className="text-2xl font-bold">{getAllReadingProgress().length} chapters</div>
+              <div className="text-2xl font-bold">{readingProgress.length} chapters</div>
               <p className="text-sm text-muted-foreground mt-1">Keep reading!</p>
             </div>
           </div>
