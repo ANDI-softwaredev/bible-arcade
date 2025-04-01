@@ -1,6 +1,7 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 
 export interface QuizQuestion {
   id: string;
@@ -111,12 +112,15 @@ export const saveGeneratedQuiz = async (quiz: GeneratedQuiz): Promise<void> => {
       return;
     }
 
+    // Convert QuizQuestion[] to Json type by using JSON.stringify and then parsing
+    const jsonQuestions = JSON.parse(JSON.stringify(quiz.questions)) as Json;
+    
     await supabase
       .from('generated_quizzes')
       .insert({
         user_id: user.id,
         title: quiz.title,
-        questions: quiz.questions,
+        questions: jsonQuestions,
         created_at: quiz.timestamp
       });
   } catch (error) {
@@ -143,11 +147,11 @@ export const getSavedGeneratedQuizzes = async (): Promise<GeneratedQuiz[]> => {
     
     if (!data) return [];
 
-    // Map to our GeneratedQuiz interface
+    // Safely convert data from Json to QuizQuestion[]
     return data.map(item => ({
       id: item.id,
       title: item.title,
-      questions: item.questions as QuizQuestion[],
+      questions: item.questions as unknown as QuizQuestion[],
       timestamp: item.created_at
     }));
   } catch (error) {

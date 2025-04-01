@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,7 +34,6 @@ export function TextToQuizGenerator() {
       const selectedFile = e.target.files[0];
       if (selectedFile.type === "application/pdf") {
         setFile(selectedFile);
-        // Clear the text content when a file is selected
         setContent("");
       } else {
         toast({
@@ -75,13 +73,11 @@ export function TextToQuizGenerator() {
         : [questionType];
       
       if (file) {
-        // Generate from PDF
         questions = await generateQAPairsFromPDF(file, {
           numQuestions: parseInt(numQuestions),
           questionTypes
         });
       } else {
-        // Generate from text
         questions = await generateQAPairsFromText(content, {
           numQuestions: parseInt(numQuestions),
           questionTypes
@@ -117,7 +113,6 @@ export function TextToQuizGenerator() {
     }
     
     try {
-      // Convert QA pairs to quiz format
       const quizQuestions = generatedQuestions.map((qa, index) => ({
         id: `ai-${Date.now()}-${index}`,
         questionText: qa.question,
@@ -127,11 +122,11 @@ export function TextToQuizGenerator() {
         explanation: "",
       }));
       
-      // Save the quiz
       saveGeneratedQuiz({
+        id: `quiz-${Date.now()}`,
         title,
         questions: quizQuestions,
-        timestamp: Date.now()
+        timestamp: new Date().toISOString()
       });
       
       toast({
@@ -139,7 +134,6 @@ export function TextToQuizGenerator() {
         description: "The generated quiz has been saved"
       });
       
-      // Reset form
       setGeneratedQuestions([]);
       setTitle("");
       setContent("");
