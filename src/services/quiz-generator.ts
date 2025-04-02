@@ -9,6 +9,9 @@ export interface QuizQuestion {
   options?: string[];
   correctAnswer: string;
   explanation?: string;
+  timeLimit?: number; // Time limit in seconds
+  points?: number; // Points for this question
+  difficultyLevel?: string; // Difficulty level
 }
 
 export interface GeneratedQuiz {
@@ -71,6 +74,8 @@ export const generateAIQuiz = async (params: {
   title: string;
   numQuestions: number;
   quizType: "multiple-choice" | "true-false" | "fill-in-blanks";
+  timed?: boolean; // Option for timed quiz
+  difficultyDistribution?: boolean; // Option to distribute questions by difficulty
 }): Promise<GeneratedQuiz> => {
   try {
     const response = await fetch("/api/generate-quiz", {
@@ -86,6 +91,47 @@ export const generateAIQuiz = async (params: {
     }
 
     const quiz = await response.json();
+    
+    // If timed option is set, assign time limits and points based on difficulty
+    if (params.timed && quiz.questions) {
+      quiz.questions = quiz.questions.map((question: QuizQuestion) => {
+        const difficultyLevel = question.difficultyLevel || 'easy-to-go';
+        
+        // Assign time limits and points based on difficulty
+        let timeLimit = 5; // default
+        let points = 5; // default
+        
+        switch (difficultyLevel) {
+          case 'easy-to-go':
+            timeLimit = 5;
+            points = 5;
+            break;
+          case 'minimum-thinking':
+            timeLimit = 7;
+            points = 10;
+            break;
+          case 'maximum-thinking':
+            timeLimit = 10;
+            points = 15;
+            break;
+          case 'crack-my-head':
+            timeLimit = 15;
+            points = 20;
+            break;
+          case 'granite-hard':
+            timeLimit = 20;
+            points = 25;
+            break;
+        }
+        
+        return {
+          ...question,
+          timeLimit,
+          points
+        };
+      });
+    }
+    
     return {
       id: uuidv4(),
       title: params.title,

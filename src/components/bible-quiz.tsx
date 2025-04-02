@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -14,14 +14,16 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { CheckCircle, XCircle, AlertCircle, BookText } from "lucide-react";
+import { CheckCircle, XCircle, AlertCircle, BookText, Clock, Trophy } from "lucide-react";
 import { 
   bibleBooks, 
   QuizQuestion, 
   QuestionDifficulty, 
   QuestionType,
+  QuizDifficultyLevel,
   generateQuiz,
-  saveQuizAttempt
+  saveQuizAttempt,
+  difficultySettings
 } from "@/data/bible-database";
 import { useToast } from "@/hooks/use-toast";
 
@@ -34,7 +36,7 @@ export function BibleQuiz({ onComplete }: BibleQuizProps) {
   
   // Quiz configuration
   const [selectedBooks, setSelectedBooks] = useState<string[]>([]);
-  const [difficulty, setDifficulty] = useState<QuestionDifficulty>("medium");
+  const [difficultyLevel, setDifficultyLevel] = useState<QuizDifficultyLevel>("easy-to-go");
   const [questionCount, setQuestionCount] = useState(5);
   const [quizStarted, setQuizStarted] = useState(false);
   
@@ -46,6 +48,59 @@ export function BibleQuiz({ onComplete }: BibleQuizProps) {
   const [score, setScore] = useState(0);
   const [totalPossible, setTotalPossible] = useState(0);
   
+  // Timer state
+  const [timeRemaining, setTimeRemaining] = useState(0);
+  const [isTimeUp, setIsTimeUp] = useState(false);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Clear timer when component unmounts
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, []);
+  
+  // Start timer for current question
+  useEffect(() => {
+    if (quizStarted && !quizCompleted && currentQuestions.length > 0 && !isTimeUp) {
+      const currentQuestion = currentQuestions[currentQuestionIndex];
+      const timeLimit = currentQuestion.timeLimit || difficultySettings[difficultyLevel].timeLimit;
+      
+      setTimeRemaining(timeLimit);
+      
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+      
+      timerRef.current = setInterval(() => {
+        setTimeRemaining(prev => {
+          if (prev <= 1) {
+            // Time's up - clear interval and move to next question
+            clearInterval(timerRef.current as NodeJS.Timeout);
+            setIsTimeUp(true);
+            
+            // Auto move to next question after 2 seconds
+            setTimeout(() => {
+              setIsTimeUp(false);
+              goToNextQuestion();
+            }, 2000);
+            
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [currentQuestionIndex, quizStarted, quizCompleted, currentQuestions]);
+  
   // Update selected books
   const handleBookSelection = (testament: "oldTestament" | "newTestament", selected: boolean) => {
     if (selected) {
@@ -55,11 +110,22 @@ export function BibleQuiz({ onComplete }: BibleQuizProps) {
     }
   };
   
+  // Filter for specific books
+  const handleSpecificBooks = () => {
+    const specificBooks = ["Numbers", "Hebrews", "Ezra", "Mark"];
+    setSelectedBooks(specificBooks);
+  };
+  
   // Start the quiz
   const startQuiz = () => {
+    // Default to Numbers, Hebrews, Ezra, Mark if no books selected
+    const booksForQuiz = selectedBooks.length > 0 
+      ? selectedBooks 
+      : ["Numbers", "Hebrews", "Ezra", "Mark"];
+    
     const questions = generateQuiz({
-      books: selectedBooks.length > 0 ? selectedBooks : undefined,
-      difficulty,
+      books: booksForQuiz,
+      difficultyLevel: difficultyLevel,
       questionCount,
     });
     
@@ -78,35 +144,68 @@ export function BibleQuiz({ onComplete }: BibleQuizProps) {
     setQuizStarted(true);
     setQuizCompleted(false);
     setScore(0);
+    setIsTimeUp(false);
     setTotalPossible(questions.reduce((sum, q) => sum + q.points, 0));
+    
+    // Initialize timer for first question
+    const firstQuestionTimeLimit = questions[0].timeLimit || difficultySettings[difficultyLevel].timeLimit;
+    setTimeRemaining(firstQuestionTimeLimit);
   };
   
   // Handle answer selection
   const handleAnswerSelect = (questionId: string, answer: string) => {
+    // Only allow answer if time is not up
+    if (isTimeUp) return;
+    
+    const isCorrect = answer === currentQuestions[currentQuestionIndex].correctAnswer;
+    
     setUserAnswers(prev => ({
       ...prev,
       [questionId]: answer
     }));
+    
+    // If correct answer, proceed to next question automatically
+    if (isCorrect && !isTimeUp) {
+      // Clear current timer
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+      
+      // Short delay to show feedback before moving on
+      setTimeout(() => {
+        goToNextQuestion();
+      }, 500);
+    }
   };
   
   // Navigate to next question
   const goToNextQuestion = () => {
+    // Clear current timer
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+    
     if (currentQuestionIndex < currentQuestions.length - 1) {
       setCurrentQuestionIndex(prev => prev + 1);
+      setIsTimeUp(false);
     } else {
       finishQuiz();
     }
   };
   
-  // Navigate to previous question
+  // Navigate to previous question (disabled in timed mode)
   const goToPreviousQuestion = () => {
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(prev => prev - 1);
-    }
+    // Previous navigation is disabled in timed quiz
+    return;
   };
   
   // Finish the quiz and calculate score
   const finishQuiz = () => {
+    // Clear any active timer
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+    
     let calculatedScore = 0;
     
     const questionResults = currentQuestions.map(question => {
@@ -153,8 +252,27 @@ export function BibleQuiz({ onComplete }: BibleQuizProps) {
   
   // Restart the quiz
   const restartQuiz = () => {
+    // Clear timer if active
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+    
     setQuizStarted(false);
     setQuizCompleted(false);
+    setIsTimeUp(false);
+  };
+  
+  // Get the timer color based on remaining time percentage
+  const getTimerColor = () => {
+    const currentQuestion = currentQuestions[currentQuestionIndex];
+    if (!currentQuestion) return "bg-primary";
+    
+    const timeLimit = currentQuestion.timeLimit || difficultySettings[difficultyLevel].timeLimit;
+    const percentage = (timeRemaining / timeLimit) * 100;
+    
+    if (percentage > 60) return "bg-green-500";
+    if (percentage > 30) return "bg-yellow-500";
+    return "bg-red-500";
   };
   
   // Render the current question
@@ -163,16 +281,60 @@ export function BibleQuiz({ onComplete }: BibleQuizProps) {
     
     const question = currentQuestions[currentQuestionIndex];
     const userAnswer = userAnswers[question.id] || "";
-    const isShowingResults = quizCompleted;
+    const isShowingResults = isTimeUp || quizCompleted;
     
     return (
       <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <div className="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm">
-            Question {currentQuestionIndex + 1} of {currentQuestions.length}
+          <div className="flex gap-2 items-center">
+            <div className="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm">
+              Question {currentQuestionIndex + 1} of {currentQuestions.length}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {question.book} {question.chapter}{question.verse ? `:${question.verse}` : ""}
+            </div>
           </div>
-          <div className="text-sm text-muted-foreground">
-            {question.book} {question.chapter}{question.verse ? `:${question.verse}` : ""}
+          
+          <div className="flex items-center gap-2">
+            <Clock className={cn(
+              "h-4 w-4",
+              timeRemaining <= 5 ? "text-red-500" : "text-primary"
+            )} />
+            <span className={cn(
+              "font-bold",
+              timeRemaining <= 5 ? "text-red-500" : "text-primary"
+            )}>
+              {timeRemaining}s
+            </span>
+          </div>
+        </div>
+        
+        <div className="w-full h-2 rounded-full bg-gray-200 overflow-hidden">
+          <div 
+            className={cn(
+              "h-full transition-all duration-1000", 
+              getTimerColor()
+            )} 
+            style={{ 
+              width: `${(timeRemaining / (question.timeLimit || difficultySettings[difficultyLevel].timeLimit)) * 100}%` 
+            }}
+          />
+        </div>
+        
+        <div className="flex items-center gap-2 mb-2">
+          <div className={cn(
+            "px-3 py-1 rounded text-sm text-white",
+            difficultyLevel === "easy-to-go" && "bg-green-500",
+            difficultyLevel === "minimum-thinking" && "bg-blue-500",
+            difficultyLevel === "maximum-thinking" && "bg-yellow-600",
+            difficultyLevel === "crack-my-head" && "bg-orange-500",
+            difficultyLevel === "granite-hard" && "bg-red-600",
+          )}>
+            {difficultyLevel.split("-").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")}
+          </div>
+          <div className="text-sm flex items-center gap-1">
+            <Trophy className="h-4 w-4 text-amber-500" />
+            <span>{question.points} points</span>
           </div>
         </div>
         
@@ -190,7 +352,11 @@ export function BibleQuiz({ onComplete }: BibleQuizProps) {
               const isSelected = userAnswer === option;
               
               return (
-                <div key={idx} className="flex items-center space-x-2">
+                <div key={idx} className={cn(
+                  "flex items-center space-x-2 p-3 rounded-md transition-all",
+                  isShowingResults && isCorrect && "bg-green-50",
+                  isShowingResults && isSelected && !isCorrect && "bg-red-50"
+                )}>
                   <RadioGroupItem 
                     value={option} 
                     id={`option-${idx}`} 
@@ -202,7 +368,7 @@ export function BibleQuiz({ onComplete }: BibleQuizProps) {
                   <Label 
                     htmlFor={`option-${idx}`}
                     className={cn(
-                      "flex items-center gap-2",
+                      "flex items-center gap-2 w-full cursor-pointer",
                       isShowingResults && isCorrect && "text-green-600 font-medium",
                       isShowingResults && isSelected && !isCorrect && "text-red-600"
                     )}
@@ -260,30 +426,6 @@ export function BibleQuiz({ onComplete }: BibleQuizProps) {
             <div className="text-sm">{question.explanation}</div>
           </div>
         )}
-        
-        <div className="flex justify-between pt-4">
-          <Button
-            variant="outline"
-            onClick={goToPreviousQuestion}
-            disabled={currentQuestionIndex === 0}
-          >
-            Previous
-          </Button>
-          
-          {!quizCompleted && userAnswer && (
-            <Button
-              onClick={goToNextQuestion}
-            >
-              {currentQuestionIndex === currentQuestions.length - 1 ? "Finish Quiz" : "Next Question"}
-            </Button>
-          )}
-          
-          {quizCompleted && (
-            <Button onClick={restartQuiz}>
-              Start New Quiz
-            </Button>
-          )}
-        </div>
       </div>
     );
   };
@@ -293,14 +435,20 @@ export function BibleQuiz({ onComplete }: BibleQuizProps) {
     if (!quizCompleted) return null;
     
     const percentageScore = Math.round((score / totalPossible) * 100);
+    const correctAnswers = currentQuestions.filter((q, idx) => 
+      userAnswers[q.id] === q.correctAnswer
+    ).length;
     
     return (
-      <div className="space-y-4">
+      <div className="space-y-6">
         <div className="text-center py-4">
           <div className="text-2xl font-bold mb-2">Quiz Results</div>
           <div className="text-4xl font-bold text-primary mb-2">{percentageScore}%</div>
-          <div className="text-lg">
+          <div className="text-lg mb-2">
             You scored {score} out of {totalPossible} points
+          </div>
+          <div>
+            {correctAnswers} of {currentQuestions.length} questions correct
           </div>
         </div>
         
@@ -308,6 +456,49 @@ export function BibleQuiz({ onComplete }: BibleQuizProps) {
           value={percentageScore} 
           className="h-3" 
         />
+        
+        <div className="space-y-4">
+          <h3 className="font-medium text-lg">Question Review</h3>
+          {currentQuestions.map((question, idx) => {
+            const userAnswer = userAnswers[question.id] || "";
+            const isCorrect = userAnswer === question.correctAnswer;
+            
+            return (
+              <div key={idx} className={cn(
+                "p-4 rounded-lg border",
+                isCorrect ? "border-green-200 bg-green-50/50" : "border-red-200 bg-red-50/50"
+              )}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="font-medium">Question {idx + 1}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {question.book} {question.chapter}{question.verse ? `:${question.verse}` : ""}
+                  </div>
+                </div>
+                <div className="mb-2">{question.questionText}</div>
+                <div className={cn(
+                  "text-sm flex items-start gap-2",
+                  isCorrect ? "text-green-600" : "text-red-600"
+                )}>
+                  {isCorrect ? (
+                    <CheckCircle className="h-4 w-4 mt-0.5" />
+                  ) : (
+                    <XCircle className="h-4 w-4 mt-0.5" />
+                  )}
+                  <div>
+                    <div>
+                      {isCorrect ? "Correct" : `Your answer: ${userAnswer || "(No answer)"}`}
+                    </div>
+                    {!isCorrect && (
+                      <div className="text-green-600">
+                        Correct answer: {question.correctAnswer}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
         
         <div className="pt-4 flex justify-center">
           <Button onClick={restartQuiz}>
@@ -322,8 +513,17 @@ export function BibleQuiz({ onComplete }: BibleQuizProps) {
   const renderQuizSetup = () => {
     return (
       <div className="space-y-6">
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium">Select Books</h3>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-medium">Select Books</h3>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={handleSpecificBooks}
+            >
+              Use Numbers, Hebrews, Ezra & Mark
+            </Button>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -412,18 +612,20 @@ export function BibleQuiz({ onComplete }: BibleQuizProps) {
         
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="difficulty">Difficulty</Label>
+            <Label htmlFor="difficultyLevel">Difficulty Level</Label>
             <Select 
-              value={difficulty} 
-              onValueChange={(value: QuestionDifficulty) => setDifficulty(value)}
+              value={difficultyLevel} 
+              onValueChange={(value: QuizDifficultyLevel) => setDifficultyLevel(value)}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select difficulty" />
+                <SelectValue placeholder="Select difficulty level" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="easy">Easy</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="hard">Hard</SelectItem>
+                <SelectItem value="easy-to-go">Easy to Go (5s, 5pts)</SelectItem>
+                <SelectItem value="minimum-thinking">Minimum Thinking (7s, 10pts)</SelectItem>
+                <SelectItem value="maximum-thinking">Maximum Thinking (10s, 15pts)</SelectItem>
+                <SelectItem value="crack-my-head">Crack My Head (15s, 20pts)</SelectItem>
+                <SelectItem value="granite-hard">Granite Hard (20s, 25pts)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -449,7 +651,7 @@ export function BibleQuiz({ onComplete }: BibleQuizProps) {
         
         <div className="pt-4">
           <Button onClick={startQuiz} className="w-full">
-            Start Quiz
+            Start Timed Quiz
           </Button>
         </div>
       </div>
@@ -464,7 +666,7 @@ export function BibleQuiz({ onComplete }: BibleQuizProps) {
           <span>Bible Quiz Assessment</span>
         </CardTitle>
         <CardDescription>
-          Test your knowledge of the Bible with interactive quizzes
+          Test your knowledge of the Bible with timed interactive quizzes
         </CardDescription>
       </CardHeader>
       
