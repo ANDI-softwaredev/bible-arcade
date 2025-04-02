@@ -1,12 +1,20 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Sparkles, Download, BookOpen, BookCheck, ChevronRight, Star, AlertCircle } from "lucide-react";
-import { getAllReadingProgress, getAllJournalEntries } from "@/services/bible-api";
+import { Sparkles, Download, BookOpen, BookCheck, ChevronRight, Star, AlertCircle, Clock, BarChart } from "lucide-react";
+import { 
+  getAllReadingProgress, 
+  getAllJournalEntries,
+  getQuizResults,
+  getStudyDuration
+} from "@/services/bible-api";
 import { bibleBooks } from "@/data/bible-database";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { GrowingSeedAnimation } from "@/components/ui/growing-seed-animation";
+import { useAuth } from "@/contexts/AuthContext";
 
 export interface LearningPlanData {
   username: string;
@@ -21,10 +29,23 @@ export interface LearningPlanData {
   quizScores: {
     average: number;
     lastAttempts: number[];
+    strengths: string[];
+    weaknesses: string[];
   };
   nextMilestone: {
     description: string;
     chaptersNeeded: number;
+  };
+  reviewTopics: string[];
+  suggestedSchedule: {
+    dailyReadings: string[];
+    reviewMaterials: string[];
+    practiceQuizzes: string[];
+  };
+  studyHabits: {
+    averageDuration: number; // in minutes
+    frequencyPerWeek: number;
+    bestPerformingTimeOfDay: string;
   };
 }
 
@@ -32,6 +53,7 @@ export function LearningPlanGenerator() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [learningPlan, setLearningPlan] = useState<LearningPlanData | null>(null);
   const { toast } = useToast();
+  const { user, profile } = useAuth();
   
   // Generate learning plan based on user data and quiz performance
   const generateLearningPlan = async () => {
@@ -41,6 +63,8 @@ export function LearningPlanGenerator() {
       // Get reading progress
       const readingProgress = await getAllReadingProgress();
       const journalEntries = await getAllJournalEntries();
+      const quizResults = await getQuizResults();
+      const studyDurations = await getStudyDuration();
       
       // Get completed books and chapters
       const completedBookMap = new Map();
@@ -63,14 +87,32 @@ export function LearningPlanGenerator() {
         .filter(book => !completedBookMap.has(book) || completedBookMap.get(book).length < 2)
         .slice(0, 3);
       
-      // Get recommended books based on reading patterns and weaknesses
-      const recommendedBooks = weaknesses.map(book => {
-        return {
-          name: book,
-          reason: completedBookMap.has(book) 
-            ? "Continue your progress in this book" 
-            : "New book to expand your knowledge"
-        };
+      // Get recommended books based on reading patterns, weaknesses, and quiz performance
+      const recommendedBooks = [];
+      
+      // Based on quiz performance weaknesses
+      if (quizResults && quizResults.length > 0) {
+        const quizWeaknesses = analyzeQuizWeaknesses(quizResults);
+        quizWeaknesses.forEach(book => {
+          if (!recommendedBooks.some(rec => rec.name === book)) {
+            recommendedBooks.push({
+              name: book,
+              reason: "Based on quiz performance"
+            });
+          }
+        });
+      }
+      
+      // Add recommendations based on reading gaps
+      weaknesses.forEach(book => {
+        if (!recommendedBooks.some(rec => rec.name === book)) {
+          recommendedBooks.push({
+            name: book,
+            reason: completedBookMap.has(book) 
+              ? "Continue your progress in this book" 
+              : "New book to expand your knowledge"
+          });
+        }
       });
       
       // If user has journal entries, recommend related books
@@ -87,25 +129,38 @@ export function LearningPlanGenerator() {
       // Calculate total completed chapters
       const completedChapters = readingProgress.length;
       
-      // Generate mock quiz scores (in a real app, would pull from actual quiz history)
-      const mockScores = [75, 82, 68, 90];
+      // Analyze quiz performance
+      const quizScores = analyzeQuizScores(quizResults);
+      
+      // Analyze study habits
+      const studyHabits = analyzeStudyHabits(studyDurations);
+      
+      // Generate review topics
+      const reviewTopics = generateReviewTopics(quizResults, readingProgress);
+      
+      // Create suggested schedule
+      const suggestedSchedule = createSuggestedSchedule(
+        recommendedBooks.map(b => b.name),
+        reviewTopics, 
+        quizScores.weaknesses
+      );
       
       // Create learning plan
       const plan: LearningPlanData = {
-        username: "Samuel", // This should be dynamic based on the user
+        username: profile?.full_name || user?.email?.split('@')[0] || "Friend",
         strengths: strengths.length > 0 ? strengths : ["Genesis", "Psalms", "John"],
         weaknesses: weaknesses.length > 0 ? weaknesses : ["Revelation", "Ezekiel", "Leviticus"],
         recommendedBooks: recommendedBooks.slice(0, 3),
         completedChaptersCount: completedChapters,
         totalChaptersGoal: completedChapters + 30, // Set a goal of 30 more chapters
-        quizScores: {
-          average: mockScores.reduce((sum, score) => sum + score, 0) / mockScores.length,
-          lastAttempts: mockScores
-        },
+        quizScores,
         nextMilestone: {
           description: "Complete 25% of the New Testament",
           chaptersNeeded: 65 - completedChapters
-        }
+        },
+        reviewTopics,
+        suggestedSchedule,
+        studyHabits
       };
       
       setLearningPlan(plan);
@@ -123,6 +178,231 @@ export function LearningPlanGenerator() {
     } finally {
       setIsGenerating(false);
     }
+  };
+  
+  // Analyze quiz results to identify strengths and weaknesses
+  const analyzeQuizWeaknesses = (quizResults) => {
+    // Group questions by book and track correct/incorrect
+    const bookPerformance = {};
+    
+    quizResults.forEach(result => {
+      if (!result.questions) return;
+      
+      result.questions.forEach(question => {
+        if (!question.book) return;
+        
+        if (!bookPerformance[question.book]) {
+          bookPerformance[question.book] = { correct: 0, total: 0 };
+        }
+        
+        bookPerformance[question.book].total++;
+        if (question.isCorrect) {
+          bookPerformance[question.book].correct++;
+        }
+      });
+    });
+    
+    // Identify books with poor performance (less than 60% correct)
+    const weaknessBooks = [];
+    Object.entries(bookPerformance).forEach(([book, data]: [string, any]) => {
+      const percentage = (data.correct / data.total) * 100;
+      if (percentage < 60 && data.total >= 3) { // Only consider books with at least 3 questions
+        weaknessBooks.push(book);
+      }
+    });
+    
+    return weaknessBooks.slice(0, 3); // Return top 3 weakness books
+  };
+  
+  // Analyze quiz scores
+  const analyzeQuizScores = (quizResults) => {
+    if (!quizResults || quizResults.length === 0) {
+      return {
+        average: 75,
+        lastAttempts: [75, 82, 68, 90],
+        strengths: ["Old Testament History", "Psalms", "Gospels"],
+        weaknesses: ["Prophets", "Epistles", "Revelation"]
+      };
+    }
+    
+    // Calculate real quiz performance
+    const scores = quizResults.map(result => 
+      Math.round((result.score / result.totalPossible) * 100)
+    );
+    
+    const average = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+    
+    // Analyze question categories
+    const categoryPerformance = {};
+    quizResults.forEach(result => {
+      if (!result.questions) return;
+      
+      result.questions.forEach(question => {
+        if (!question.category) return;
+        
+        if (!categoryPerformance[question.category]) {
+          categoryPerformance[question.category] = { correct: 0, total: 0 };
+        }
+        
+        categoryPerformance[question.category].total++;
+        if (question.isCorrect) {
+          categoryPerformance[question.category].correct++;
+        }
+      });
+    });
+    
+    // Calculate percentage for each category
+    const categoryScores = {};
+    Object.entries(categoryPerformance).forEach(([category, data]: [string, any]) => {
+      categoryScores[category] = (data.correct / data.total) * 100;
+    });
+    
+    // Sort categories by performance
+    const sortedCategories = Object.entries(categoryScores)
+      .sort(([_, a], [__, b]) => (b as number) - (a as number))
+      .map(([category]) => category);
+    
+    return {
+      average,
+      lastAttempts: scores.slice(-4), // Get the last 4 attempts
+      strengths: sortedCategories.slice(0, 3),
+      weaknesses: sortedCategories.reverse().slice(0, 3)
+    };
+  };
+  
+  // Analyze study habits
+  const analyzeStudyHabits = (studyDurations) => {
+    if (!studyDurations || studyDurations.length === 0) {
+      return {
+        averageDuration: 25,
+        frequencyPerWeek: 3,
+        bestPerformingTimeOfDay: "evening"
+      };
+    }
+    
+    // Calculate average duration
+    const durations = studyDurations.map(session => session.duration);
+    const averageDuration = Math.round(
+      durations.reduce((sum, duration) => sum + duration, 0) / durations.length
+    );
+    
+    // Calculate frequency per week
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    
+    const sessionsInLastWeek = studyDurations.filter(
+      session => new Date(session.timestamp) >= oneWeekAgo
+    );
+    const frequencyPerWeek = sessionsInLastWeek.length;
+    
+    // Determine best performing time of day
+    const timePerformance = {
+      morning: { count: 0, averageScore: 0 },
+      afternoon: { count: 0, averageScore: 0 },
+      evening: { count: 0, averageScore: 0 },
+      night: { count: 0, averageScore: 0 }
+    };
+    
+    studyDurations.forEach(session => {
+      if (!session.timestamp || !session.score) return;
+      
+      const hour = new Date(session.timestamp).getHours();
+      let timeOfDay;
+      
+      if (hour >= 5 && hour < 12) timeOfDay = "morning";
+      else if (hour >= 12 && hour < 17) timeOfDay = "afternoon";
+      else if (hour >= 17 && hour < 21) timeOfDay = "evening";
+      else timeOfDay = "night";
+      
+      timePerformance[timeOfDay].count++;
+      timePerformance[timeOfDay].averageScore += session.score;
+    });
+    
+    // Calculate average score for each time of day
+    Object.keys(timePerformance).forEach(time => {
+      if (timePerformance[time].count > 0) {
+        timePerformance[time].averageScore /= timePerformance[time].count;
+      }
+    });
+    
+    // Find best performing time of day
+    let bestTime = "evening"; // default
+    let bestScore = 0;
+    Object.entries(timePerformance).forEach(([time, data]: [string, any]) => {
+      if (data.count > 0 && data.averageScore > bestScore) {
+        bestScore = data.averageScore;
+        bestTime = time;
+      }
+    });
+    
+    return {
+      averageDuration,
+      frequencyPerWeek,
+      bestPerformingTimeOfDay: bestTime
+    };
+  };
+  
+  // Generate review topics
+  const generateReviewTopics = (quizResults, readingProgress) => {
+    // Default topics if no data is available
+    const defaultTopics = [
+      "The Ten Commandments",
+      "The Beatitudes",
+      "Creation Story",
+      "The Parables of Jesus",
+      "The Crucifixion Narrative"
+    ];
+    
+    if (!quizResults || quizResults.length === 0) return defaultTopics;
+    
+    // Find topics from incorrect answers
+    const incorrectTopics = new Set();
+    quizResults.forEach(result => {
+      if (!result.questions) return;
+      
+      result.questions.forEach(question => {
+        if (!question.isCorrect && question.topic) {
+          incorrectTopics.add(question.topic);
+        }
+      });
+    });
+    
+    // Combine with recently read chapters that might need review
+    const recentlyRead = readingProgress
+      .sort((a, b) => new Date(b.lastRead).getTime() - new Date(a.lastRead).getTime())
+      .slice(0, 5)
+      .map(item => `${item.book} ${item.chapter}`);
+    
+    // Combine both sources of review topics
+    const reviewTopics = [...Array.from(incorrectTopics), ...recentlyRead];
+    
+    return reviewTopics.slice(0, 5); // Limit to 5 topics
+  };
+  
+  // Create suggested schedule
+  const createSuggestedSchedule = (recommendedBooks, reviewTopics, quizWeaknesses) => {
+    // Create daily reading plan
+    const dailyReadings = recommendedBooks.map(book => `${book} (next chapter)`);
+    
+    // Create review materials
+    const reviewMaterials = reviewTopics.map(topic => 
+      typeof topic === 'string' && topic.includes(' ') 
+        ? `Review ${topic}` 
+        : `Study guide on ${topic}`
+    );
+    
+    // Create practice quizzes
+    const practiceQuizzes = [
+      "Quiz on Basic Bible Knowledge",
+      ...quizWeaknesses.map(weakness => `Practice questions on ${weakness}`),
+      "Interactive timeline review"
+    ];
+    
+    return {
+      dailyReadings,
+      reviewMaterials,
+      practiceQuizzes: practiceQuizzes.slice(0, 3)
+    };
   };
   
   // Create a downloadable text version of the learning plan
@@ -149,14 +429,37 @@ AREAS FOR IMPROVEMENT
 --------------------
 ${learningPlan.weaknesses.map(weakness => `- ${weakness}`).join('\n')}
 
-RECOMMENDED READING
-------------------
-${learningPlan.recommendedBooks.map(book => `- ${book.name}: ${book.reason}`).join('\n')}
-
 QUIZ PERFORMANCE
 ---------------
 Average score: ${learningPlan.quizScores.average.toFixed(1)}%
 Recent scores: ${learningPlan.quizScores.lastAttempts.join('%, ')}%
+Strong categories: ${learningPlan.quizScores.strengths.join(', ')}
+Needs improvement: ${learningPlan.quizScores.weaknesses.join(', ')}
+
+STUDY HABITS
+-----------
+Average session duration: ${learningPlan.studyHabits.averageDuration} minutes
+Weekly frequency: ${learningPlan.studyHabits.frequencyPerWeek} sessions
+Best performance time: ${learningPlan.studyHabits.bestPerformingTimeOfDay}
+
+RECOMMENDED READING
+------------------
+${learningPlan.recommendedBooks.map(book => `- ${book.name}: ${book.reason}`).join('\n')}
+
+SUGGESTED REVIEW TOPICS
+----------------------
+${learningPlan.reviewTopics.map(topic => `- ${topic}`).join('\n')}
+
+SUGGESTED WEEKLY SCHEDULE
+-----------------------
+Daily Readings:
+${learningPlan.suggestedSchedule.dailyReadings.map(reading => `- ${reading}`).join('\n')}
+
+Review Materials:
+${learningPlan.suggestedSchedule.reviewMaterials.map(material => `- ${material}`).join('\n')}
+
+Practice Quizzes:
+${learningPlan.suggestedSchedule.practiceQuizzes.map(quiz => `- ${quiz}`).join('\n')}
 
 NEXT MILESTONE
 -------------
@@ -170,6 +473,9 @@ IMPROVEMENT STRATEGIES
 3. Join a study group for accountability
 4. Use the journal feature to reflect on what you've learned
 5. Focus on understanding rather than completion
+6. Review previously studied material periodically
+7. Study during your best performance time (${learningPlan.studyHabits.bestPerformingTimeOfDay})
+8. Aim to increase weekly study sessions gradually
     `;
     
     const blob = new Blob([content], { type: 'text/plain' });
@@ -196,17 +502,19 @@ IMPROVEMENT STRATEGIES
           Personalized Learning Plan
         </CardTitle>
         <CardDescription>
-          Generate a custom study plan based on your progress and quiz performance
+          Generate a custom study plan based on your progress, quiz performance, and study habits
         </CardDescription>
       </CardHeader>
       
       <CardContent>
-        {!learningPlan ? (
+        {isGenerating ? (
+          <GrowingSeedAnimation message="Growing your personalized plan..." />
+        ) : !learningPlan ? (
           <div className="flex flex-col items-center justify-center py-8">
             <BookOpen className="h-16 w-16 text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium mb-2">Create Your Learning Plan</h3>
             <p className="text-muted-foreground text-center mb-6 max-w-md">
-              We'll analyze your reading progress and quiz performance to create a
+              We'll analyze your reading progress, quiz performance, and study habits to create a
               personalized study plan to help you grow in your biblical knowledge.
             </p>
             <Button 
@@ -232,7 +540,7 @@ IMPROVEMENT STRATEGIES
               />
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Star className="h-4 w-4 text-amber-500" />
@@ -262,6 +570,63 @@ IMPROVEMENT STRATEGIES
                   ))}
                 </div>
               </div>
+              
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-blue-500" />
+                  STUDY HABITS
+                </h3>
+                <div className="space-y-1">
+                  <div className="flex items-center">
+                    <ChevronRight className="h-4 w-4 text-primary mr-1" />
+                    <span>{learningPlan.studyHabits.averageDuration} min sessions</span>
+                  </div>
+                  <div className="flex items-center">
+                    <ChevronRight className="h-4 w-4 text-primary mr-1" />
+                    <span>{learningPlan.studyHabits.frequencyPerWeek}× per week</span>
+                  </div>
+                  <div className="flex items-center">
+                    <ChevronRight className="h-4 w-4 text-primary mr-1" />
+                    <span>Best time: {learningPlan.studyHabits.bestPerformingTimeOfDay}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-muted-foreground">QUIZ PERFORMANCE</h3>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm">Average Score</span>
+                <span className="font-medium">{learningPlan.quizScores.average.toFixed(1)}%</span>
+              </div>
+              <Progress 
+                value={learningPlan.quizScores.average} 
+                className="h-1.5 mb-3" 
+              />
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Strong Categories</p>
+                  <div className="flex flex-wrap gap-2">
+                    {learningPlan.quizScores.strengths.map((category, i) => (
+                      <Badge key={i} variant="outline" className="bg-green-500/10">
+                        {category}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+                
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Needs Improvement</p>
+                  <div className="flex flex-wrap gap-2">
+                    {learningPlan.quizScores.weaknesses.map((category, i) => (
+                      <Badge key={i} variant="outline" className="bg-orange-500/10">
+                        {category}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
             
             <div className="space-y-3">
@@ -276,6 +641,41 @@ IMPROVEMENT STRATEGIES
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+            
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <BarChart className="h-4 w-4 text-primary" />
+                SUGGESTED WEEKLY PLAN
+              </h3>
+              <div className="space-y-2 text-sm">
+                <div>
+                  <p className="font-medium mb-1">Daily Readings:</p>
+                  <ul className="list-disc pl-5 space-y-1">
+                    {learningPlan.suggestedSchedule.dailyReadings.map((reading, i) => (
+                      <li key={i}>{reading}</li>
+                    ))}
+                  </ul>
+                </div>
+                
+                <div>
+                  <p className="font-medium mb-1 mt-3">Review Topics:</p>
+                  <ul className="list-disc pl-5 space-y-1">
+                    {learningPlan.reviewTopics.slice(0, 3).map((topic, i) => (
+                      <li key={i}>{topic}</li>
+                    ))}
+                  </ul>
+                </div>
+                
+                <div>
+                  <p className="font-medium mb-1 mt-3">Practice Quizzes:</p>
+                  <ul className="list-disc pl-5 space-y-1">
+                    {learningPlan.suggestedSchedule.practiceQuizzes.map((quiz, i) => (
+                      <li key={i}>{quiz}</li>
+                    ))}
+                  </ul>
+                </div>
               </div>
             </div>
             

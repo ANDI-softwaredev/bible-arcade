@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { CheckCircle, XCircle, AlertCircle, BookText, Clock, Trophy } from "lucide-react";
+import { GrowingSeedAnimation } from "@/components/ui/growing-seed-animation";
 import { 
   bibleBooks, 
   QuizQuestion, 
@@ -26,6 +26,7 @@ import {
   difficultySettings
 } from "@/data/bible-database";
 import { useToast } from "@/hooks/use-toast";
+import { saveQuizResult } from "@/services/quiz-generator";
 
 interface BibleQuizProps {
   onComplete?: (score: number, totalPossible: number, percentageScore: number) => void;
@@ -47,6 +48,7 @@ export function BibleQuiz({ onComplete }: BibleQuizProps) {
   const [quizCompleted, setQuizCompleted] = useState(false);
   const [score, setScore] = useState(0);
   const [totalPossible, setTotalPossible] = useState(0);
+  const [isGenerating, setIsGenerating] = useState(false);
   
   // Timer state
   const [timeRemaining, setTimeRemaining] = useState(0);
@@ -118,38 +120,44 @@ export function BibleQuiz({ onComplete }: BibleQuizProps) {
   
   // Start the quiz
   const startQuiz = () => {
+    setIsGenerating(true);
+    
     // Default to Numbers, Hebrews, Ezra, Mark if no books selected
     const booksForQuiz = selectedBooks.length > 0 
       ? selectedBooks 
       : ["Numbers", "Hebrews", "Ezra", "Mark"];
     
-    const questions = generateQuiz({
-      books: booksForQuiz,
-      difficultyLevel: difficultyLevel,
-      questionCount,
-    });
-    
-    if (questions.length === 0) {
-      toast({
-        title: "No questions available",
-        description: "Please select different criteria or try a different difficulty level.",
-        variant: "destructive"
+    setTimeout(() => {
+      const questions = generateQuiz({
+        books: booksForQuiz,
+        difficultyLevel: difficultyLevel,
+        questionCount,
       });
-      return;
-    }
-    
-    setCurrentQuestions(questions);
-    setCurrentQuestionIndex(0);
-    setUserAnswers({});
-    setQuizStarted(true);
-    setQuizCompleted(false);
-    setScore(0);
-    setIsTimeUp(false);
-    setTotalPossible(questions.reduce((sum, q) => sum + q.points, 0));
-    
-    // Initialize timer for first question
-    const firstQuestionTimeLimit = questions[0].timeLimit || difficultySettings[difficultyLevel].timeLimit;
-    setTimeRemaining(firstQuestionTimeLimit);
+      
+      if (questions.length === 0) {
+        toast({
+          title: "No questions available",
+          description: "Please select different criteria or try a different difficulty level.",
+          variant: "destructive"
+        });
+        setIsGenerating(false);
+        return;
+      }
+      
+      setCurrentQuestions(questions);
+      setCurrentQuestionIndex(0);
+      setUserAnswers({});
+      setQuizStarted(true);
+      setQuizCompleted(false);
+      setScore(0);
+      setIsTimeUp(false);
+      setTotalPossible(questions.reduce((sum, q) => sum + q.points, 0));
+      
+      // Initialize timer for first question
+      const firstQuestionTimeLimit = questions[0].timeLimit || difficultySettings[difficultyLevel].timeLimit;
+      setTimeRemaining(firstQuestionTimeLimit);
+      setIsGenerating(false);
+    }, 1500); // Simulate generation time
   };
   
   // Handle answer selection
@@ -226,16 +234,30 @@ export function BibleQuiz({ onComplete }: BibleQuizProps) {
     setScore(calculatedScore);
     setQuizCompleted(true);
     
-    // Save quiz attempt
+    // Save quiz result with detailed question performance
     const percentageScore = Math.round((calculatedScore / totalPossible) * 100);
     
-    saveQuizAttempt({
+    // Record individual question performance for analysis
+    const questionResultsWithIsCorrect = currentQuestions.map(question => {
+      const userAnswer = userAnswers[question.id] || "";
+      const isCorrect = userAnswer === question.correctAnswer;
+      
+      return {
+        ...question,
+        isCorrect
+      };
+    });
+    
+    // Save comprehensive quiz result for analytics
+    saveQuizResult({
       quizId: `quiz-${Date.now()}`,
-      date: new Date(),
       score: calculatedScore,
-      totalPossible,
-      percentageScore,
-      questions: questionResults
+      timeSpent: getQuizDuration(),
+      correctAnswers: questionResultsWithIsCorrect.filter(q => q.isCorrect).length,
+      totalQuestions: questionResultsWithIsCorrect.length,
+      timeBonus: 0, // If implemented
+      questions: questionResultsWithIsCorrect,
+      completedAt: new Date().toISOString()
     });
     
     // Notify parent component
@@ -273,6 +295,13 @@ export function BibleQuiz({ onComplete }: BibleQuizProps) {
     if (percentage > 60) return "bg-green-500";
     if (percentage > 30) return "bg-yellow-500";
     return "bg-red-500";
+  };
+  
+  // Calculate quiz duration (this would be properly implemented with start/end time tracking)
+  const getQuizDuration = () => {
+    // Fallback calculation based on question times
+    return currentQuestions.reduce((total, question) => 
+      total + (question.timeLimit || difficultySettings[difficultyLevel].timeLimit), 0);
   };
   
   // Render the current question
@@ -671,7 +700,9 @@ export function BibleQuiz({ onComplete }: BibleQuizProps) {
       </CardHeader>
       
       <CardContent>
-        {quizStarted ? (
+        {isGenerating ? (
+          <GrowingSeedAnimation message="Growing your quiz questions..." />
+        ) : quizStarted ? (
           quizCompleted ? renderResults() : renderQuestion()
         ) : (
           renderQuizSetup()

@@ -12,6 +12,12 @@ export interface QuizQuestion {
   timeLimit?: number; // Time limit in seconds
   points?: number; // Points for this question
   difficultyLevel?: string; // Difficulty level
+  book?: string; // Bible book this question relates to
+  chapter?: number; // Chapter this question relates to
+  verse?: number; // Verse this question relates to (optional)
+  category?: string; // Question category (e.g., "Old Testament History", "Gospel", "Epistles")
+  topic?: string; // Specific topic (e.g., "Creation", "Sermon on the Mount")
+  isCorrect?: boolean; // Was this question answered correctly
 }
 
 export interface GeneratedQuiz {
@@ -19,6 +25,9 @@ export interface GeneratedQuiz {
   title: string;
   questions: QuizQuestion[];
   timestamp: string;
+  categories?: string[]; // Categories covered in this quiz
+  topics?: string[]; // Topics covered in this quiz
+  difficultyLevels?: string[]; // Difficulty levels in this quiz
 }
 
 export interface QuizResult {
@@ -28,6 +37,18 @@ export interface QuizResult {
   correctAnswers: number;
   totalQuestions: number;
   timeBonus: number;
+  questions?: QuizQuestion[]; // Detailed question results including whether they were correct
+  categories?: string[]; // Categories covered in this quiz
+  topics?: string[]; // Topics covered in this quiz
+  completedAt?: string; // When the quiz was completed
+}
+
+export interface StudySession {
+  duration: number; // in minutes
+  timestamp: string;
+  book?: string;
+  chapter?: number;
+  score?: number; // If associated with a quiz
 }
 
 // Function to extract text from a PDF file
@@ -131,12 +152,26 @@ export const generateAIQuiz = async (params: {
         };
       });
     }
+
+    // Extract categories and topics
+    const categories = new Set<string>();
+    const topics = new Set<string>();
+    const difficultyLevels = new Set<string>();
+    
+    quiz.questions.forEach((q: QuizQuestion) => {
+      if (q.category) categories.add(q.category);
+      if (q.topic) topics.add(q.topic);
+      if (q.difficultyLevel) difficultyLevels.add(q.difficultyLevel);
+    });
     
     return {
       id: uuidv4(),
       title: params.title,
       questions: quiz.questions,
       timestamp: new Date().toISOString(),
+      categories: Array.from(categories),
+      topics: Array.from(topics),
+      difficultyLevels: Array.from(difficultyLevels)
     };
   } catch (error) {
     console.error("Error generating quiz:", error);
@@ -216,6 +251,16 @@ export const saveQuizResult = async (result: QuizResult): Promise<void> => {
       return;
     }
 
+    // Add timestamp if not provided
+    if (!result.completedAt) {
+      result.completedAt = new Date().toISOString();
+    }
+    
+    // Convert question results to Json
+    const jsonQuestions = result.questions ? 
+      JSON.parse(JSON.stringify(result.questions)) as Json : 
+      null;
+
     await supabase
       .from('quiz_results')
       .insert({
@@ -225,10 +270,113 @@ export const saveQuizResult = async (result: QuizResult): Promise<void> => {
         time_spent: result.timeSpent,
         correct_answers: result.correctAnswers,
         total_questions: result.totalQuestions,
-        time_bonus: result.timeBonus
+        time_bonus: result.timeBonus,
+        completed_at: result.completedAt,
+        questions: jsonQuestions
       });
   } catch (error) {
     console.error("Error saving quiz result:", error);
+  }
+};
+
+// Get all quiz results for the current user
+export const getQuizResults = async (): Promise<QuizResult[]> => {
+  try {
+    const { data: session } = await supabase.auth.getSession();
+    const user = session?.session?.user;
+
+    if (!user) {
+      // Return mock data if not authenticated
+      return [
+        {
+          quizId: "mock-1",
+          score: 85,
+          timeSpent: 300,
+          correctAnswers: 17,
+          totalQuestions: 20,
+          timeBonus: 15,
+          completedAt: new Date().toISOString(),
+          questions: [
+            {
+              id: "q1",
+              questionText: "Mock Question 1",
+              correctAnswer: "Answer",
+              book: "Genesis",
+              chapter: 1,
+              category: "Old Testament History",
+              isCorrect: true
+            }
+          ]
+        }
+      ];
+    }
+
+    const { data } = await supabase
+      .from('quiz_results')
+      .select("*")
+      .eq("user_id", user.id)
+      .order("completed_at", { ascending: false });
+    
+    if (!data) return [];
+
+    return data.map(item => ({
+      quizId: item.quiz_id,
+      score: item.score,
+      timeSpent: item.time_spent,
+      correctAnswers: item.correct_answers,
+      totalQuestions: item.total_questions,
+      timeBonus: item.time_bonus,
+      completedAt: item.completed_at,
+      questions: item.questions as unknown as QuizQuestion[]
+    }));
+  } catch (error) {
+    console.error("Error getting quiz results:", error);
+    return [];
+  }
+};
+
+// Save study duration data
+export const saveStudyDuration = async (session: StudySession): Promise<void> => {
+  try {
+    const { data: authSession } = await supabase.auth.getSession();
+    const user = authSession?.session?.user;
+
+    if (!user) {
+      // Skip saving if not authenticated
+      return;
+    }
+
+    // Save to local storage for now (would need a new table to store properly)
+    const existingSessions = localStorage.getItem('study-sessions');
+    const sessions: StudySession[] = existingSessions ? JSON.parse(existingSessions) : [];
+    sessions.push({
+      ...session,
+      timestamp: session.timestamp || new Date().toISOString()
+    });
+    localStorage.setItem('study-sessions', JSON.stringify(sessions));
+  } catch (error) {
+    console.error("Error saving study duration:", error);
+  }
+};
+
+// Get study duration data
+export const getStudyDuration = async (): Promise<StudySession[]> => {
+  try {
+    const { data: session } = await supabase.auth.getSession();
+    const user = session?.session?.user;
+
+    if (!user) {
+      // Return from localStorage if not authenticated
+      const existingSessions = localStorage.getItem('study-sessions');
+      return existingSessions ? JSON.parse(existingSessions) : [];
+    }
+
+    // For now, return from localStorage (would need a proper table setup)
+    const existingSessions = localStorage.getItem('study-sessions');
+    return existingSessions ? JSON.parse(existingSessions) : [];
+  } catch (error) {
+    console.error("Error getting study sessions:", error);
+    return [];
   }
 };
 

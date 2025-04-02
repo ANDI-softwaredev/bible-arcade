@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Search, BookOpen, Filter } from "lucide-react";
 import { motion } from "framer-motion";
@@ -9,8 +8,9 @@ import { cn } from "@/lib/utils";
 import { BibleReader } from "@/components/BibleReader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
+import { GrowingSeedAnimation } from "@/components/ui/growing-seed-animation";
+import { saveStudyDuration } from "@/services/quiz-generator";
 
-// Mock data
 const studyModules = [
   {
     id: 1,
@@ -86,6 +86,7 @@ const Study = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<Category>("all");
   const [activeTab, setActiveTab] = useState("studies");
+  const [loading, setLoading] = useState(false);
   const { profile } = useAuth();
   
   const filteredModules = studyModules.filter((module) => {
@@ -101,10 +102,35 @@ const Study = () => {
     return matchesSearch && matchesCategory;
   });
 
+  // Handle study session start
+  useEffect(() => {
+    const startTime = new Date();
+    let currentBook: string | undefined;
+    let currentChapter: number | undefined;
+    
+    return () => {
+      // When component unmounts, calculate duration and save
+      const endTime = new Date();
+      const duration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60)); // in minutes
+      
+      if (duration >= 1) { // Only save if at least 1 minute
+        saveStudyDuration({
+          duration,
+          timestamp: endTime.toISOString(),
+          book: currentBook,
+          chapter: currentChapter
+        });
+      }
+    };
+  }, []);
+
   // Handle progress update
-  const handleProgressUpdate = () => {
-    // In a real app, this would refresh progress data
-    console.log("Reading progress updated");
+  const handleProgressUpdate = (book?: string, chapter?: number) => {
+    // Save book and chapter information for study duration tracking
+    if (book && chapter) {
+      // In a real app, this would update the current reading position
+      console.log("Reading progress updated:", book, chapter);
+    }
   };
   
   return (
@@ -195,7 +221,16 @@ const Study = () => {
           </TabsContent>
           
           <TabsContent value="read">
-            <BibleReader onProgressUpdate={handleProgressUpdate} />
+            {loading ? (
+              <div className="py-12">
+                <GrowingSeedAnimation message="Loading the Bible..." />
+              </div>
+            ) : (
+              <BibleReader 
+                onProgressUpdate={handleProgressUpdate} 
+                onLoadingChange={(isLoading) => setLoading(isLoading)}
+              />
+            )}
           </TabsContent>
         </Tabs>
       </div>

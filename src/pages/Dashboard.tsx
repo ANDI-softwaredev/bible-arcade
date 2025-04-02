@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { BookOpen, Calendar, Clock, BookMarked, BarChart2 } from "lucide-react";
 import { Layout } from "@/components/layout";
@@ -9,6 +8,7 @@ import { ProgressChart } from "@/components/progress-chart";
 import { LearningPlanGenerator } from "@/components/learning-plan-generator";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { GrowingSeedAnimation } from "@/components/ui/growing-seed-animation";
 import { 
   calculateOverallProgress, 
   calculateTestamentProgress,
@@ -188,8 +188,8 @@ const Dashboard = () => {
   if (loading) {
     return (
       <Layout>
-        <div className="pt-8 sm:pt-12">
-          <h1 className="text-3xl font-bold">Loading dashboard...</h1>
+        <div className="pt-8 sm:pt-12 flex justify-center items-center min-h-[60vh]">
+          <GrowingSeedAnimation message="Loading your spiritual journey..." />
         </div>
       </Layout>
     );
