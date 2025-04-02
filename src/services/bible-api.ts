@@ -1,7 +1,7 @@
-
 import { BibleVerse, BibleChapter, getChapter as getLocalChapter } from "@/data/bible-rsv";
 import { updateReadingProgress as dbUpdateReadingProgress } from "@/data/bible-database";
 import { supabase } from "@/integrations/supabase/client";
+import { QuizResult, StudySession } from "@/services/quiz-generator";
 
 // API Configuration
 const API_KEY = "74ec65c32bccc3be8b1a835fc6f9e77d"; // Public API key for API.Bible
@@ -521,6 +521,93 @@ export const getCompletedBooks = async (): Promise<string[]> => {
     return Array.from(completedBooks);
   } catch (error) {
     console.error("Error getting completed books:", error);
+    return [];
+  }
+};
+
+// Get quiz results
+export const getQuizResults = async (): Promise<QuizResult[]> => {
+  try {
+    const { data: session } = await supabase.auth.getSession();
+    const user = session?.session?.user;
+
+    if (!user) {
+      // Return example data if not authenticated
+      return [
+        {
+          quizId: "mock-1",
+          score: 85,
+          timeSpent: 300,
+          correctAnswers: 17,
+          totalQuestions: 20,
+          timeBonus: 15,
+          completedAt: new Date().toISOString(),
+          questions: [
+            {
+              id: "q1",
+              questionText: "Who was the first person created according to Genesis?",
+              correctAnswer: "Adam",
+              book: "Genesis",
+              chapter: 1,
+              category: "Old Testament History",
+              isCorrect: true
+            }
+          ]
+        }
+      ];
+    }
+
+    // Get quiz results from supabase
+    const { data } = await supabase
+      .from('quiz_results')
+      .select("*")
+      .eq("user_id", user.id)
+      .order("completed_at", { ascending: false });
+    
+    if (!data) return [];
+
+    // Map database results to QuizResult interface
+    return data.map(item => ({
+      quizId: item.quiz_id,
+      score: item.score,
+      timeSpent: item.time_spent,
+      correctAnswers: item.correct_answers,
+      totalQuestions: item.total_questions,
+      timeBonus: item.time_bonus,
+      completedAt: item.completed_at,
+      questions: item.questions || [] // Handle potentially missing questions
+    }));
+  } catch (error) {
+    console.error("Error getting quiz results:", error);
+    return [];
+  }
+};
+
+// Get study duration data
+export const getStudyDuration = async (): Promise<StudySession[]> => {
+  try {
+    const { data: session } = await supabase.auth.getSession();
+    const user = session?.session?.user;
+
+    if (!user) {
+      // Return from localStorage if not authenticated
+      const existingSessions = localStorage.getItem('study-sessions');
+      return existingSessions ? JSON.parse(existingSessions) : [];
+    }
+
+    // For now, return from localStorage (would need a proper table setup)
+    const existingSessions = localStorage.getItem('study-sessions');
+    const sessions = existingSessions ? JSON.parse(existingSessions) : [];
+    
+    return sessions.map((session: any) => ({
+      duration: session.duration || 0,
+      timestamp: session.timestamp || new Date().toISOString(),
+      book: session.book,
+      chapter: session.chapter,
+      score: session.score
+    }));
+  } catch (error) {
+    console.error("Error getting study sessions:", error);
     return [];
   }
 };

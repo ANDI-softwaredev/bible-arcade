@@ -5,7 +5,7 @@ import { Layout } from "@/components/layout";
 import { Input } from "@/components/ui/input";
 import { StudyCard } from "@/components/ui/study-card";
 import { cn } from "@/lib/utils";
-import { BibleReader } from "@/components/BibleReader";
+import { BibleReaderAdapter } from "@/components/bible-reader-adapter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { GrowingSeedAnimation } from "@/components/ui/growing-seed-animation";
@@ -226,9 +226,9 @@ const Study = () => {
                 <GrowingSeedAnimation message="Loading the Bible..." />
               </div>
             ) : (
-              <BibleReader 
-                onProgressUpdate={handleProgressUpdate} 
-                onLoadingChange={(isLoading) => setLoading(isLoading)}
+              <BibleReaderAdapter
+                onProgressUpdate={handleProgressUpdate}
+                onLoadingChange={setLoading}
               />
             )}
           </TabsContent>
