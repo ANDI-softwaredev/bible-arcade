@@ -1,360 +1,314 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
+
+import { useState, useEffect } from "react";
+import { ChevronDown, Book, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Textarea } from "@/components/ui/textarea";
-import { ChevronLeft, ChevronRight, BookOpen, CheckCircle, Save } from "lucide-react";
-import { bibleBooks } from "@/data/bible-database";
+import { Card } from "@/components/ui/card";
 import { 
-  getAllBooks, 
-  saveReadingProgress,
-  getAllReadingProgress,
-  BibleAPIBook,
-  getChapterJournal,
-  saveChapterJournal
-} from "@/services/bible-api";
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { 
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { BibleReader } from "@/components/BibleReader";
 import { useToast } from "@/hooks/use-toast";
-import { Label } from "@/components/ui/label";
+import { 
+  getBibleBooks, 
+  getBibleChapter,
+  BibleBook, 
+  saveReadingProgress 
+} from "@/services/bible-api";
+import { VerseLoading } from "./ui/verse-loading";
 
 interface BibleReadingProps {
-  initialBook?: string;
-  initialChapter?: number;
   onReadComplete?: (book: string, chapter: number) => void;
 }
 
-export function BibleReading({ 
-  initialBook = "John", 
-  initialChapter = 1,
-  onReadComplete
-}: BibleReadingProps) {
-  const [selectedBook, setSelectedBook] = useState(initialBook);
-  const [selectedChapter, setSelectedChapter] = useState(initialChapter);
+export function BibleReading({ onReadComplete }: BibleReadingProps) {
   const [loading, setLoading] = useState(true);
-  const [chapterCount, setChapterCount] = useState(1);
-  const [allBooks, setAllBooks] = useState<BibleAPIBook[]>([]);
-  const [readingProgress, setReadingProgress] = useState<Record<string, boolean>>({});
-  const [journalText, setJournalText] = useState("");
+  const [books, setBooks] = useState<BibleBook[]>([]);
+  const [selectedBook, setSelectedBook] = useState<BibleBook | null>(null);
+  const [selectedChapter, setSelectedChapter] = useState<number>(1);
+  const [chapterContent, setChapterContent] = useState<string>("");
+  const [expandedBooks, setExpandedBooks] = useState<string[]>([]);
   const { toast } = useToast();
   
-  // Load all books
+  const toggleBookExpansion = (bookId: string) => {
+    if (expandedBooks.includes(bookId)) {
+      setExpandedBooks(expandedBooks.filter(id => id !== bookId));
+    } else {
+      setExpandedBooks([...expandedBooks, bookId]);
+    }
+  };
+  
+  // Fetch books on component mount
   useEffect(() => {
-    const loadBooksAndProgress = async () => {
+    const loadBooks = async () => {
       try {
-        const books = await getAllBooks();
-        setAllBooks(books);
+        setLoading(true);
+        const allBooks = await getBibleBooks();
+        setBooks(allBooks);
         
-        // Load reading progress
-        const progress = await getAllReadingProgress();
-        const progressMap: Record<string, boolean> = {};
+        // Set first book as default
+        if (allBooks.length > 0) {
+          setSelectedBook(allBooks[0]);
+        }
+      } catch (error) {
+        console.error("Error loading Bible books:", error);
+        toast({
+          title: "Error loading Bible data",
+          description: "Could not load the list of books. Please try again later.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadBooks();
+  }, [toast]);
+  
+  // Fetch chapter content when book or chapter changes
+  useEffect(() => {
+    const loadChapter = async () => {
+      if (!selectedBook) return;
+      
+      try {
+        setLoading(true);
+        const chapter = await getBibleChapter(undefined, selectedBook.id, selectedChapter);
+        setChapterContent(chapter.content);
+      } catch (error) {
+        console.error("Error loading Bible chapter:", error);
+        toast({
+          title: "Error loading chapter",
+          description: `Could not load ${selectedBook.name} chapter ${selectedChapter}.`,
+          variant: "destructive",
+        });
+        setChapterContent("");
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadChapter();
+  }, [selectedBook, selectedChapter, toast]);
+  
+  // Handle chapter selection
+  const handleChapterSelect = (chapterNum: number) => {
+    setSelectedChapter(chapterNum);
+  };
+  
+  // Mark reading as complete
+  const handleMarkComplete = () => {
+    if (selectedBook) {
+      try {
+        saveReadingProgress(selectedBook.name, selectedChapter);
         
-        progress.forEach(p => {
-          progressMap[`${p.book}-${p.chapter}`] = p.completed;
+        toast({
+          title: "Reading marked as complete",
+          description: `You've completed ${selectedBook.name} chapter ${selectedChapter}.`,
         });
         
-        setReadingProgress(progressMap);
-      } catch (error) {
-        console.error("Failed to load Bible books:", error);
-        // Fallback to local book list if API fails
-        const oldTestamentBooks = bibleBooks.oldTestament.map((name, i) => ({
-          id: `OT${i}`,
-          name,
-          testament: "OT" as const,
-          chapters: 50, // Default
-        }));
-        
-        const newTestamentBooks = bibleBooks.newTestament.map((name, i) => ({
-          id: `NT${i}`,
-          name,
-          testament: "NT" as const,
-          chapters: 28, // Default
-        }));
-        
-        setAllBooks([...oldTestamentBooks, ...newTestamentBooks]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    loadBooksAndProgress();
-  }, []);
-  
-  // Load chapter data and journal when book or chapter changes
-  useEffect(() => {
-    const loadChapterJournal = async () => {
-      setLoading(true);
-      
-      try {
-        // Find book ID from the name
-        const book = allBooks.find(b => b.name === selectedBook);
-        
-        if (book) {
-          // Set chapter count for the selected book
-          setChapterCount(book.chapters);
-        } else {
-          // Estimate chapter count based on common Bible knowledge
-          const chapterCounts: Record<string, number> = {
-            "Genesis": 50,
-            "Exodus": 40,
-            "Leviticus": 27,
-            "Numbers": 36,
-            "Deuteronomy": 34,
-            "Matthew": 28,
-            "Mark": 16,
-            "Luke": 24,
-            "John": 21,
-            "Acts": 28,
-            "Romans": 16,
-            // Add more as needed
-          };
-          
-          setChapterCount(chapterCounts[selectedBook] || 1);
+        if (onReadComplete) {
+          onReadComplete(selectedBook.name, selectedChapter);
         }
-        
-        // Load journal text for this chapter
-        const journal = await getChapterJournal(selectedBook, selectedChapter);
-        setJournalText(journal || "");
       } catch (error) {
-        console.error("Error loading chapter journal:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    if (allBooks.length > 0 || selectedBook) {
-      loadChapterJournal();
-    }
-  }, [selectedBook, selectedChapter, allBooks]);
-  
-  // Mark chapter as read
-  const markAsRead = async (checked: boolean) => {
-    if (checked) {
-      await saveReadingProgress(selectedBook, selectedChapter);
-      
-      // Update local state
-      setReadingProgress({
-        ...readingProgress,
-        [`${selectedBook}-${selectedChapter}`]: true
-      });
-      
-      toast({
-        title: "Chapter Completed!",
-        description: `You've marked ${selectedBook} ${selectedChapter} as read.`,
-      });
-      
-      // Call callback if provided
-      if (onReadComplete) {
-        onReadComplete(selectedBook, selectedChapter);
-      }
-    } else {
-      // Handle unmarking as read (optional)
-      // For now, we'll just show a toast but not actually remove the progress
-      toast({
-        title: "Note",
-        description: "Your reading history has been maintained.",
-      });
-    }
-  };
-  
-  const saveJournal = async () => {
-    await saveChapterJournal(selectedBook, selectedChapter, journalText);
-    toast({
-      title: "Journal Saved",
-      description: "Your notes for this chapter have been saved.",
-    });
-  };
-  
-  // Navigation functions
-  const goToPreviousChapter = () => {
-    if (selectedChapter > 1) {
-      setSelectedChapter(selectedChapter - 1);
-    } else {
-      // Find previous book
-      const allBookNames = allBooks.map(b => b.name);
-      const currentIndex = allBookNames.indexOf(selectedBook);
-      
-      if (currentIndex > 0) {
-        const prevBook = allBookNames[currentIndex - 1];
-        const prevBookObj = allBooks.find(b => b.name === prevBook);
-        
-        setSelectedBook(prevBook);
-        // Set to last chapter of previous book
-        setSelectedChapter(prevBookObj?.chapters || 1);
+        console.error("Error marking reading as complete:", error);
+        toast({
+          title: "Error saving progress",
+          description: "Could not save your reading progress.",
+          variant: "destructive",
+        });
       }
     }
   };
   
-  const goToNextChapter = () => {
-    if (selectedChapter < chapterCount) {
-      setSelectedChapter(selectedChapter + 1);
-    } else {
-      // Find next book
-      const allBookNames = allBooks.map(b => b.name);
-      const currentIndex = allBookNames.indexOf(selectedBook);
-      
-      if (currentIndex < allBookNames.length - 1) {
-        const nextBook = allBookNames[currentIndex + 1];
-        setSelectedBook(nextBook);
-        setSelectedChapter(1);
-      }
+  // Handle book selection from dropdown
+  const handleBookSelect = (bookId: string) => {
+    const book = books.find(b => b.id === bookId);
+    if (book) {
+      setSelectedBook(book);
+      setSelectedChapter(1); // Reset to chapter 1 when book changes
     }
   };
   
-  // Generate array of chapters for the select
-  const chapterOptions = Array.from({ length: chapterCount }, (_, i) => i + 1);
+  // Filter books by testament
+  const oldTestament = books.filter(book => book.testament === "OT");
+  const newTestament = books.filter(book => book.testament === "NT");
   
-  // Check if this chapter is already read
-  const isChapterRead = readingProgress[`${selectedBook}-${selectedChapter}`] || false;
-
+  if (loading && books.length === 0) {
+    return <VerseLoading />;
+  }
+  
   return (
-    <Card className="w-full">
-      <CardHeader className="pb-2">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <CardTitle className="flex items-center gap-2 text-xl">
-            <BookOpen className="h-5 w-5 text-primary" />
-            <span>Reading Tracker</span>
-            {isChapterRead && (
-              <Badge variant="outline" className="ml-2 bg-primary/10 text-primary flex items-center gap-1">
-                <CheckCircle className="h-3 w-3" />
-                <span>Read</span>
-              </Badge>
-            )}
-          </CardTitle>
+    <div className="grid md:grid-cols-7 gap-6">
+      <div className="md:col-span-2 space-y-4">
+        <div className="glass-card rounded-lg p-4">
+          <h2 className="text-lg font-semibold mb-4">Select a Book</h2>
           
-          <div className="flex items-center gap-2">
-            <div className="grid grid-cols-2 gap-2">
-              <Select 
-                value={selectedBook} 
-                onValueChange={(value) => {
-                  setSelectedBook(value);
-                  setSelectedChapter(1);
-                }}
-              >
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Book" />
-                </SelectTrigger>
-                <SelectContent>
-                  <div className="max-h-[300px] overflow-y-auto">
-                    <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">Old Testament</div>
-                    {allBooks
-                      .filter(book => book.testament === "OT")
-                      .map((book) => (
-                        <SelectItem key={book.id} value={book.name}>
-                          {book.name}
-                        </SelectItem>
-                      ))}
-                    <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">New Testament</div>
-                    {allBooks
-                      .filter(book => book.testament === "NT")
-                      .map((book) => (
-                        <SelectItem key={book.id} value={book.name}>
-                          {book.name}
-                        </SelectItem>
-                      ))}
-                  </div>
-                </SelectContent>
-              </Select>
-              
-              <Select 
-                value={selectedChapter.toString()} 
-                onValueChange={(value) => setSelectedChapter(parseInt(value))}
-              >
-                <SelectTrigger className="w-[100px]">
-                  <SelectValue placeholder="Chapter" />
-                </SelectTrigger>
-                <SelectContent>
-                  <div className="max-h-[200px] overflow-y-auto">
-                    {chapterOptions.map((chapter) => (
-                      <SelectItem key={chapter} value={chapter.toString()}>
-                        Chapter {chapter}
-                      </SelectItem>
-                    ))}
-                  </div>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          <Select value={selectedBook?.id} onValueChange={handleBookSelect}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select a book" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectLabel>Old Testament</SelectLabel>
+                {oldTestament.map((book) => (
+                  <SelectItem key={book.id} value={book.id}>{book.name}</SelectItem>
+                ))}
+              </SelectGroup>
+              <SelectGroup>
+                <SelectLabel>New Testament</SelectLabel>
+                {newTestament.map((book) => (
+                  <SelectItem key={book.id} value={book.id}>{book.name}</SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </div>
-      </CardHeader>
-      
-      <CardContent>
-        {loading ? (
-          <div className="py-8 text-center">Loading...</div>
-        ) : (
-          <div className="space-y-4">
-            <div className="text-xl font-semibold">
-              {selectedBook} {selectedChapter}
-            </div>
-            
-            <div className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="chapter-read" 
-                  checked={isChapterRead}
-                  onCheckedChange={markAsRead}
-                />
-                <Label
-                  htmlFor="chapter-read"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+        
+        {selectedBook && (
+          <div className="glass-card rounded-lg p-4">
+            <h2 className="text-lg font-semibold mb-4">Select a Chapter</h2>
+            <div className="grid grid-cols-4 gap-2">
+              {selectedBook.chapters.map((chapter) => (
+                <Button
+                  key={chapter}
+                  variant={chapter === selectedChapter ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => handleChapterSelect(chapter)}
+                  className="w-full"
                 >
-                  I have read this chapter
-                </Label>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="journal" className="text-sm font-medium">
-                  Journal your thoughts, key verses, and insights:
-                </Label>
-                <Textarea
-                  id="journal"
-                  placeholder="Write your notes, reflections, or key points from this chapter..."
-                  className="min-h-[200px]"
-                  value={journalText}
-                  onChange={(e) => setJournalText(e.target.value)}
-                />
-                <Button 
-                  onClick={saveJournal} 
-                  className="mt-2 flex items-center gap-2"
-                >
-                  <Save className="h-4 w-4" />
-                  Save Journal
+                  {chapter}
                 </Button>
-              </div>
-            </div>
-            
-            <div className="flex justify-between pt-4">
-              <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={goToPreviousChapter}
-                  className="flex items-center gap-1"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  Previous
-                </Button>
-                
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={goToNextChapter}
-                  className="flex items-center gap-1"
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
+              ))}
             </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+        
+        <div className="glass-card rounded-lg p-4">
+          <h2 className="text-lg font-semibold mb-4">Browse Bible</h2>
+          
+          {/* Old Testament */}
+          <Collapsible 
+            open={expandedBooks.includes("old-testament")}
+            onOpenChange={() => toggleBookExpansion("old-testament")}
+          >
+            <CollapsibleTrigger asChild>
+              <div className="flex items-center justify-between cursor-pointer p-2 hover:bg-accent rounded-md">
+                <span className="font-medium">Old Testament</span>
+                <ChevronDown className={`h-4 w-4 transform transition-transform ${expandedBooks.includes("old-testament") ? "rotate-180" : ""}`} />
+              </div>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pl-4 space-y-1">
+              {oldTestament.map((book) => (
+                <div 
+                  key={book.id}
+                  className="py-1 px-2 cursor-pointer hover:bg-accent rounded-md"
+                  onClick={() => {
+                    setSelectedBook(book);
+                    setSelectedChapter(1);
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <Book className="h-3 w-3" />
+                    <span className={selectedBook?.id === book.id ? "font-medium text-primary" : ""}>
+                      {book.name}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </CollapsibleContent>
+          </Collapsible>
+          
+          {/* New Testament */}
+          <Collapsible 
+            open={expandedBooks.includes("new-testament")}
+            onOpenChange={() => toggleBookExpansion("new-testament")}
+            className="mt-2"
+          >
+            <CollapsibleTrigger asChild>
+              <div className="flex items-center justify-between cursor-pointer p-2 hover:bg-accent rounded-md">
+                <span className="font-medium">New Testament</span>
+                <ChevronDown className={`h-4 w-4 transform transition-transform ${expandedBooks.includes("new-testament") ? "rotate-180" : ""}`} />
+              </div>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pl-4 space-y-1">
+              {newTestament.map((book) => (
+                <div 
+                  key={book.id}
+                  className="py-1 px-2 cursor-pointer hover:bg-accent rounded-md"
+                  onClick={() => {
+                    setSelectedBook(book);
+                    setSelectedChapter(1);
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <Book className="h-3 w-3" />
+                    <span className={selectedBook?.id === book.id ? "font-medium text-primary" : ""}>
+                      {book.name}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
+      </div>
+      
+      <div className="md:col-span-5">
+        <Card className="p-6 glass-card">
+          {loading ? (
+            <VerseLoading />
+          ) : (
+            <>
+              <div className="mb-6 flex items-center justify-between">
+                <h2 className="text-xl font-bold">
+                  {selectedBook?.name} {selectedChapter}
+                </h2>
+                <Button onClick={handleMarkComplete}>Mark as Read</Button>
+              </div>
+              
+              <div className="bible-reader-container prose dark:prose-invert max-w-none">
+                <BibleReader content={chapterContent} />
+              </div>
+              
+              <div className="mt-6 pt-6 border-t border-border flex justify-between">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (selectedChapter > 1) {
+                      setSelectedChapter(selectedChapter - 1);
+                    }
+                  }}
+                  disabled={selectedChapter <= 1}
+                >
+                  Previous Chapter
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (selectedBook && selectedChapter < selectedBook.chapters.length) {
+                      setSelectedChapter(selectedChapter + 1);
+                    }
+                  }}
+                  disabled={!selectedBook || selectedChapter >= selectedBook.chapters.length}
+                >
+                  Next Chapter
+                </Button>
+              </div>
+            </>
+          )}
+        </Card>
+      </div>
+    </div>
   );
 }

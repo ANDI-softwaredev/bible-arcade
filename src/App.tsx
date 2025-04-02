@@ -69,7 +69,7 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-// Routes Component
+// Routes Component with ThemeProvider correctly applied
 const AppRoutes = () => {
   return (
     <Routes>
@@ -128,19 +128,19 @@ const AppRoutes = () => {
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <AuthProvider>
-          <TooltipProvider>
-            <BrowserRouter>
+      <BrowserRouter>
+        <ThemeProvider>
+          <AuthProvider>
+            <TooltipProvider>
               <AnimatePresence mode="wait">
                 <AppRoutes />
               </AnimatePresence>
               <Toaster />
               <Sonner />
-            </BrowserRouter>
-          </TooltipProvider>
-        </AuthProvider>
-      </ThemeProvider>
+            </TooltipProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </BrowserRouter>
     </QueryClientProvider>
   );
 };

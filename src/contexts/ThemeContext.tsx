@@ -11,12 +11,15 @@ type ThemeContextType = {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  // Use this approach to safely handle initial state with SSR/hydration
   const [theme, setTheme] = useState<Theme>("dark");
   const [isMounted, setIsMounted] = useState(false);
 
-  // Initialize theme from localStorage or system preference
+  // Use a separate useEffect for mounting logic
   useEffect(() => {
     setIsMounted(true);
+    
+    // Initialize theme from localStorage or system preference
     const savedTheme = localStorage.getItem("theme") as Theme;
     if (savedTheme) {
       setTheme(savedTheme);
@@ -59,8 +62,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setTheme(theme === "dark" ? "light" : "dark");
   };
 
+  // Return a stable context value
+  const contextValue = React.useMemo(
+    () => ({
+      theme,
+      toggleTheme,
+    }),
+    [theme]
+  );
+
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={contextValue}>
       {children}
     </ThemeContext.Provider>
   );
