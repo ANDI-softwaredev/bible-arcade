@@ -66,6 +66,16 @@ export default {
           'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
           border: 'hsl(var(--sidebar-border))',
           ring: 'hsl(var(--sidebar-ring))'
+        },
+        coral: {
+          light: '#FF7F6E',
+          DEFAULT: '#FF6B54',
+          dark: '#E85A45'
+        },
+        teal: {
+          light: '#5CE1E6',
+          DEFAULT: '#38CDD6',
+          dark: '#2AACB5'
         }
       },
       borderRadius: {
@@ -102,6 +112,11 @@ export default {
           '0%': { opacity: '0', transform: 'translateX(-10px)' },
           '100%': { opacity: '1', transform: 'translateX(0)' },
         },
+        gradientBackground: {
+          '0%': { 'background-position': '0% 50%' },
+          '50%': { 'background-position': '100% 50%' },
+          '100%': { 'background-position': '0% 50%' },
+        }
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -110,9 +125,14 @@ export default {
         shimmer: 'shimmer 2s infinite',
         slideUpAndFade: 'slideUpAndFade 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
         slideRightAndFade: 'slideRightAndFade 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+        'gradient-background': 'gradientBackground 15s ease infinite',
       },
       backdropBlur: {
         xs: '2px',
+      },
+      backgroundImage: {
+        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+        'cosmic-glow': 'linear-gradient(to bottom, rgba(128, 90, 213, 0.15) 0%, rgba(76, 79, 173, 0.1) 20%, transparent 60%)',
       },
     }
   },

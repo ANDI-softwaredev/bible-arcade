@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Search, BookOpen, Filter } from "lucide-react";
 import { motion } from "framer-motion";
@@ -8,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { BibleReaderAdapter } from "@/components/bible-reader-adapter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
-import { GrowingSeedAnimation } from "@/components/ui/growing-seed-animation";
+import { VerseLoading } from "@/components/ui/verse-loading";
 import { saveStudyDuration } from "@/services/quiz-generator";
 
 const studyModules = [
@@ -145,9 +146,9 @@ const Study = () => {
         </header>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full mb-8">
-          <TabsList className="w-full grid grid-cols-2">
-            <TabsTrigger value="studies">Study Modules</TabsTrigger>
-            <TabsTrigger value="read">Read the Bible</TabsTrigger>
+          <TabsList className="w-full grid grid-cols-2 bg-card/60 backdrop-blur-sm">
+            <TabsTrigger value="studies" className="data-[state=active]:bg-coral/80 data-[state=active]:text-white">Study Modules</TabsTrigger>
+            <TabsTrigger value="read" className="data-[state=active]:bg-teal/80 data-[state=active]:text-white">Read the Bible</TabsTrigger>
           </TabsList>
           
           <TabsContent value="studies">
@@ -159,7 +160,7 @@ const Study = () => {
                     placeholder="Search for studies..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="glass-input pl-10"
+                    className="pl-10 border-teal/20 focus:border-teal-light/50"
                   />
                 </div>
                 
@@ -171,7 +172,7 @@ const Study = () => {
                       className={cn(
                         "whitespace-nowrap px-4 py-2 rounded-full text-sm transition-all",
                         activeCategory === category.id
-                          ? "bg-primary/20 text-primary"
+                          ? "bg-coral/20 text-coral-light"
                           : "hover:bg-accent/10"
                       )}
                     >
@@ -212,7 +213,7 @@ const Study = () => {
                     setSearchQuery("");
                     setActiveCategory("all");
                   }}
-                  className="text-primary hover:underline"
+                  className="text-coral hover:underline"
                 >
                   Clear filters
                 </button>
@@ -223,7 +224,7 @@ const Study = () => {
           <TabsContent value="read">
             {loading ? (
               <div className="py-12">
-                <GrowingSeedAnimation message="Loading the Bible..." />
+                <VerseLoading message="Loading the Bible..." />
               </div>
             ) : (
               <BibleReaderAdapter

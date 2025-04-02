@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { BibleReader } from '@/components/BibleReader';
+import { VerseLoading } from '@/components/ui/verse-loading';
 
 interface BibleReaderAdapterProps {
   onProgressUpdate?: (book?: string, chapter?: number) => void;
@@ -28,11 +29,7 @@ export const BibleReaderAdapter: React.FC<BibleReaderAdapterProps> = ({
 
   return (
     <div className="w-full">
-      {loading && (
-        <div className="w-full py-4 text-center text-primary">
-          Loading scripture...
-        </div>
-      )}
+      {loading && <VerseLoading message="Loading scripture..." />}
       <BibleReader 
         onProgressUpdate={handleProgressUpdate}
         onLoading={handleLoadingChange}  

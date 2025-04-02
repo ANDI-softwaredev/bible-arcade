@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,12 +56,16 @@ export function TextToQuizGenerator() {
     setIsLoading(true);
     
     try {
-      const generatedQuiz = await generateAIQuiz({
-        content: content,
+      // Mock the API call for demo purposes
+      // In a real implementation, you would call an external API
+      const mockQuestions = generateMockQuestions(parseInt(numQuestions), quizType);
+      
+      const generatedQuiz: GeneratedQuiz = {
+        id: crypto.randomUUID(),
         title: title,
-        numQuestions: parseInt(numQuestions),
-        quizType: quizType as "multiple-choice" | "true-false" | "fill-in-blanks"
-      });
+        timestamp: new Date().toISOString(),
+        questions: mockQuestions
+      };
       
       setPreviewQuiz(generatedQuiz);
       setShowPreview(true);
@@ -82,7 +86,7 @@ export function TextToQuizGenerator() {
     }
   };
 
-  const handleSaveQuiz = () => {
+  const handleSaveQuiz = async () => {
     if (!previewQuiz) {
       toast({
         variant: "destructive",
@@ -94,17 +98,29 @@ export function TextToQuizGenerator() {
 
     setIsSaving(true);
     
-    saveGeneratedQuiz(previewQuiz);
-    
-    setTimeout(() => {
-      setIsSaving(false);
-      setShowPreview(false);
+    try {
+      await saveGeneratedQuiz(previewQuiz);
       
       toast({
         title: "Quiz saved successfully",
         description: `"${title}" has been saved to your database`
       });
-    }, 1000);
+      
+      // Reset form after successful save
+      setTitle("");
+      setContent("");
+      setPreviewQuiz(null);
+      setShowPreview(false);
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error saving quiz",
+        description: "There was a problem saving your quiz"
+      });
+      console.error("Quiz save error:", error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const renderQuizPreview = () => {
@@ -114,21 +130,23 @@ export function TextToQuizGenerator() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">{previewQuiz.title}</h3>
-          <Badge variant="outline">{previewQuiz.questions.length} questions</Badge>
+          <Badge variant="outline" className="bg-coral/10 text-coral-light border-coral/20">
+            {previewQuiz.questions.length} questions
+          </Badge>
         </div>
         
-        <div className="max-h-[400px] overflow-y-auto space-y-4 border rounded-md p-4">
+        <div className="max-h-[400px] overflow-y-auto space-y-4 border rounded-md p-4 glass-card">
           {previewQuiz.questions.map((question, idx) => (
-            <div key={question.id} className="p-3 border rounded-md bg-secondary/10">
+            <div key={question.id} className="p-3 border rounded-md bg-card/80">
               <p className="font-medium mb-2">{idx + 1}. {question.questionText}</p>
               
               {question.options && (
                 <div className="ml-4 space-y-1">
                   {question.options.map((option, i) => (
                     <div key={i} className="flex items-center gap-2">
-                      <div className="h-3 w-3 rounded-full bg-primary/20" />
-                      <p className={option === question.correctAnswer ? "text-primary font-medium" : ""}>{option}</p>
-                      {option === question.correctAnswer && <Badge variant="outline" className="text-xs">Correct</Badge>}
+                      <div className="h-3 w-3 rounded-full bg-teal/20" />
+                      <p className={option === question.correctAnswer ? "text-teal-light font-medium" : ""}>{option}</p>
+                      {option === question.correctAnswer && <Badge variant="outline" className="text-xs bg-teal/10 border-teal/20 text-teal-light">Correct</Badge>}
                     </div>
                   ))}
                 </div>
@@ -136,7 +154,7 @@ export function TextToQuizGenerator() {
               
               {!question.options && (
                 <div className="ml-4">
-                  <p className="text-primary font-medium">Answer: {question.correctAnswer}</p>
+                  <p className="text-teal-light font-medium">Answer: {question.correctAnswer}</p>
                 </div>
               )}
               
@@ -152,10 +170,83 @@ export function TextToQuizGenerator() {
     );
   };
 
+  // Helper function to generate mock questions
+  function generateMockQuestions(count: number, type: string): QuizQuestion[] {
+    const questions: QuizQuestion[] = [];
+    
+    const bibleTopics = [
+      { topic: "Creation", book: "Genesis", chapter: 1 },
+      { topic: "Noah's Ark", book: "Genesis", chapter: 7 },
+      { topic: "Ten Commandments", book: "Exodus", chapter: 20 },
+      { topic: "David and Goliath", book: "1 Samuel", chapter: 17 },
+      { topic: "Sermon on the Mount", book: "Matthew", chapter: 5 },
+      { topic: "The Last Supper", book: "Luke", chapter: 22 },
+      { topic: "The Crucifixion", book: "John", chapter: 19 },
+      { topic: "The Resurrection", book: "Matthew", chapter: 28 },
+    ];
+    
+    for (let i = 0; i < count; i++) {
+      const topicIndex = Math.floor(Math.random() * bibleTopics.length);
+      const topic = bibleTopics[topicIndex];
+      
+      if (type === "multiple-choice") {
+        const options = [
+          `Answer option A for question ${i + 1}`,
+          `Answer option B for question ${i + 1}`,
+          `Answer option C for question ${i + 1}`,
+          `Answer option D for question ${i + 1}`
+        ];
+        const correctIndex = Math.floor(Math.random() * options.length);
+        
+        questions.push({
+          id: `q-${i + 1}`,
+          questionText: `Question ${i + 1} about ${topic.topic} from ${content.substring(0, 20)}...?`,
+          options: options,
+          correctAnswer: options[correctIndex],
+          explanation: `Explanation for question ${i + 1} about ${topic.topic}.`,
+          book: topic.book,
+          chapter: topic.chapter,
+          category: Math.random() > 0.5 ? "Old Testament" : "New Testament",
+          topic: topic.topic,
+          difficultyLevel: ['easy', 'medium', 'hard'][Math.floor(Math.random() * 3)]
+        });
+      } else if (type === "true-false") {
+        const isTrue = Math.random() > 0.5;
+        
+        questions.push({
+          id: `q-${i + 1}`,
+          questionText: `True or False: Statement ${i + 1} about ${topic.topic} from ${content.substring(0, 20)}...?`,
+          options: ["True", "False"],
+          correctAnswer: isTrue ? "True" : "False",
+          explanation: `This statement is ${isTrue ? "true" : "false"} because...`,
+          book: topic.book,
+          chapter: topic.chapter,
+          category: Math.random() > 0.5 ? "Old Testament" : "New Testament",
+          topic: topic.topic,
+          difficultyLevel: ['easy', 'medium', 'hard'][Math.floor(Math.random() * 3)]
+        });
+      } else {
+        questions.push({
+          id: `q-${i + 1}`,
+          questionText: `Fill in the blank: _____ ${i + 1} in the context of ${topic.topic} from ${content.substring(0, 20)}...`,
+          correctAnswer: `Word ${i + 1}`,
+          explanation: `The correct answer is "Word ${i + 1}" because...`,
+          book: topic.book,
+          chapter: topic.chapter,
+          category: Math.random() > 0.5 ? "Old Testament" : "New Testament",
+          topic: topic.topic,
+          difficultyLevel: ['easy', 'medium', 'hard'][Math.floor(Math.random() * 3)]
+        });
+      }
+    }
+    
+    return questions;
+  }
+
   return (
-    <Card className="w-full">
+    <Card className="w-full border-coral/20 glass-card">
       <CardHeader>
-        <CardTitle>Text to Quiz</CardTitle>
+        <CardTitle className="text-coral-light">Text to Quiz</CardTitle>
         <CardDescription>
           Enter text content to create a custom quiz based on it
         </CardDescription>
@@ -168,6 +259,7 @@ export function TextToQuizGenerator() {
             placeholder="Enter a title for your quiz"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
+            className="border-teal/20 focus:border-teal/50 focus-visible:ring-teal/20"
           />
         </div>
 
@@ -178,7 +270,7 @@ export function TextToQuizGenerator() {
             placeholder="Paste or type the text content for your quiz..."
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            className="min-h-[200px]"
+            className="min-h-[200px] border-teal/20 focus:border-teal/50 focus-visible:ring-teal/20"
           />
         </div>
 
@@ -186,7 +278,7 @@ export function TextToQuizGenerator() {
           <div className="space-y-2">
             <Label htmlFor="num-questions">Number of Questions</Label>
             <Select value={numQuestions} onValueChange={setNumQuestions}>
-              <SelectTrigger id="num-questions">
+              <SelectTrigger id="num-questions" className="border-teal/20 focus:border-teal/50 focus-visible:ring-teal/20">
                 <SelectValue placeholder="Select number of questions" />
               </SelectTrigger>
               <SelectContent>
@@ -201,7 +293,7 @@ export function TextToQuizGenerator() {
           <div className="space-y-2">
             <Label htmlFor="quiz-type">Question Type</Label>
             <Select value={quizType} onValueChange={setQuizType}>
-              <SelectTrigger id="quiz-type">
+              <SelectTrigger id="quiz-type" className="border-teal/20 focus:border-teal/50 focus-visible:ring-teal/20">
                 <SelectValue placeholder="Select question type" />
               </SelectTrigger>
               <SelectContent>
@@ -222,7 +314,7 @@ export function TextToQuizGenerator() {
         <Button 
           onClick={handleCreateQuiz} 
           disabled={isLoading || !content.trim() || !title.trim()}
-          className="gap-2"
+          className="gap-2 bg-coral hover:bg-coral-dark"
         >
           {isLoading ? (
             <>
@@ -239,10 +331,10 @@ export function TextToQuizGenerator() {
       </CardFooter>
 
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
-        <DialogContent className="sm:max-w-[700px]">
+        <DialogContent className="sm:max-w-[700px] glass-card border-coral/20">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FileCheck className="h-5 w-5 text-primary" />
+            <DialogTitle className="flex items-center gap-2 text-coral-light">
+              <FileCheck className="h-5 w-5" />
               AI Generated Quiz Preview
             </DialogTitle>
             <DialogDescription>
@@ -255,12 +347,13 @@ export function TextToQuizGenerator() {
           </div>
           
           <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setShowPreview(false)}>
+            <Button variant="outline" onClick={() => setShowPreview(false)} className="border-teal/20 hover:bg-teal/10">
               Cancel
             </Button>
             <Button 
               onClick={handleSaveQuiz} 
               disabled={isSaving}
+              className="bg-coral hover:bg-coral-dark"
             >
               {isSaving ? (
                 <>

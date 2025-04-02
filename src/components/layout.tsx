@@ -58,6 +58,10 @@ export function Layout({ children, fullWidth = false, className }: LayoutProps) 
   
   return (
     <SidebarProvider>
+      {/* Cosmic background */}
+      <div className="cosmic-background"></div>
+      <div className="cosmic-stars"></div>
+      
       <div className="fixed top-4 right-8 z-50">
         <ThemeToggle />
       </div>
@@ -66,9 +70,6 @@ export function Layout({ children, fullWidth = false, className }: LayoutProps) 
         <MobileMenuTrigger />
       </div>
 
-      {/* Background glow */}
-      <div className="fixed top-0 left-0 w-full h-64 bg-gradient-to-b from-primary/5 to-transparent pointer-events-none z-0" />
-      
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         
@@ -101,7 +102,7 @@ export function Layout({ children, fullWidth = false, className }: LayoutProps) 
               onClick={scrollToTop} 
               size="icon" 
               variant="secondary"
-              className="rounded-full shadow-md hover:shadow-lg bg-primary/90 hover:bg-primary text-primary-foreground"
+              className="rounded-full shadow-md hover:shadow-lg bg-teal/90 hover:bg-teal text-primary-foreground"
             >
               <ChevronUp className="h-5 w-5" />
               <span className="sr-only">Scroll to top</span>
