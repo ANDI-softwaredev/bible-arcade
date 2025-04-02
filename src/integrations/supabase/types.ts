@@ -9,6 +9,36 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      ai_quizzes: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          questions: Json
+          quiz_type: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          questions: Json
+          quiz_type: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          questions?: Json
+          quiz_type?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       generated_quizzes: {
         Row: {
           created_at: string
@@ -56,6 +86,36 @@ export type Database = {
           id?: string
           last_updated?: string
           text?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      journals: {
+        Row: {
+          book: string
+          chapter: number
+          created_at: string
+          id: string
+          notes: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          book: string
+          chapter: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          book?: string
+          chapter?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: []

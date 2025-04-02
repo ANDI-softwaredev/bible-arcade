@@ -1,5 +1,6 @@
+
 import { useState, useEffect } from "react";
-import { ChevronDown, Book, ChevronRight } from "lucide-react";
+import { ChevronDown, Book, ChevronRight, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { 
@@ -25,6 +26,9 @@ import {
   saveReadingProgress 
 } from "@/services/bible-api";
 import { VerseLoading } from "./ui/verse-loading";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BibleJournal } from "./bible-journal";
+import { supabase } from "@/integrations/supabase/client";
 
 interface BibleReadingProps {
   onReadComplete?: (book: string, chapter: number) => void;
@@ -37,6 +41,8 @@ export function BibleReading({ onReadComplete }: BibleReadingProps) {
   const [selectedChapter, setSelectedChapter] = useState<number>(1);
   const [chapterContent, setChapterContent] = useState<string>("");
   const [expandedBooks, setExpandedBooks] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<"read" | "journal">("read");
+  const [isReadingCompleted, setIsReadingCompleted] = useState(false);
   const { toast } = useToast();
   
   const toggleBookExpansion = (bookId: string) => {
@@ -80,6 +86,9 @@ export function BibleReading({ onReadComplete }: BibleReadingProps) {
         setLoading(true);
         const chapter = await getBibleChapter(undefined, selectedBook.id, selectedChapter);
         setChapterContent(chapter.content);
+        
+        // Check if this reading has been completed
+        checkReadingComplete();
       } catch (error) {
         console.error("Error loading Bible chapter:", error);
         toast({
@@ -96,14 +105,64 @@ export function BibleReading({ onReadComplete }: BibleReadingProps) {
     loadChapter();
   }, [selectedBook, selectedChapter, toast]);
   
+  const checkReadingComplete = async () => {
+    if (!selectedBook) return;
+    
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.user) {
+        setIsReadingCompleted(false);
+        return;
+      }
+      
+      const { data } = await supabase
+        .from('reading_progress')
+        .select('completed')
+        .eq('book', selectedBook.name)
+        .eq('chapter', selectedChapter)
+        .eq('user_id', session.session.user.id)
+        .maybeSingle();
+      
+      setIsReadingCompleted(!!data?.completed);
+    } catch (error) {
+      console.error("Error checking reading progress:", error);
+      setIsReadingCompleted(false);
+    }
+  };
+  
   const handleChapterSelect = (chapterNum: number) => {
     setSelectedChapter(chapterNum);
   };
   
-  const handleMarkComplete = () => {
+  const handleMarkComplete = async () => {
     if (selectedBook) {
       try {
+        const { data: session } = await supabase.auth.getSession();
+        if (!session?.session?.user) {
+          toast({
+            title: "Authentication required",
+            description: "Please log in to track your reading progress",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        // Save locally
         saveReadingProgress(selectedBook.name, selectedChapter);
+        
+        // Save to database
+        const { data, error } = await supabase
+          .from('reading_progress')
+          .upsert({
+            book: selectedBook.name,
+            chapter: selectedChapter,
+            completed: true,
+            user_id: session.session.user.id
+          }, { onConflict: 'user_id, book, chapter' });
+        
+        if (error) throw error;
+        
+        setIsReadingCompleted(true);
         
         toast({
           title: "Reading marked as complete",
@@ -263,15 +322,63 @@ export function BibleReading({ onReadComplete }: BibleReadingProps) {
                 <h2 className="text-xl font-bold">
                   {selectedBook?.name} {selectedChapter}
                 </h2>
-                <Button onClick={handleMarkComplete}>Mark as Read</Button>
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={handleMarkComplete} 
+                    disabled={isReadingCompleted}
+                    className={isReadingCompleted ? "bg-green-600 hover:bg-green-700" : ""}
+                  >
+                    {isReadingCompleted ? "Completed ✓" : "Mark as Read"}
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setActiveTab(activeTab === "read" ? "journal" : "read")}
+                  >
+                    {activeTab === "read" ? (
+                      <>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Journal
+                      </>
+                    ) : (
+                      <>
+                        <Book className="h-4 w-4 mr-2" />
+                        Read
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
               
-              <div className="bible-reader-container prose dark:prose-invert max-w-none">
-                <BibleReader 
-                  initialBook={selectedBook?.name}
-                  initialChapter={selectedChapter}
-                />
-              </div>
+              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "read" | "journal")} className="w-full">
+                <TabsList className="w-full mb-4">
+                  <TabsTrigger value="read" className="flex-1">
+                    <Book className="h-4 w-4 mr-2" />
+                    Read
+                  </TabsTrigger>
+                  <TabsTrigger value="journal" className="flex-1">
+                    <Edit className="h-4 w-4 mr-2" />
+                    Journal
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="read" className="mt-0">
+                  <div className="bible-reader-container prose dark:prose-invert max-w-none">
+                    <BibleReader 
+                      initialBook={selectedBook?.name}
+                      initialChapter={selectedChapter}
+                    />
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="journal" className="mt-0">
+                  {selectedBook && (
+                    <BibleJournal 
+                      book={selectedBook.name} 
+                      chapter={selectedChapter} 
+                    />
+                  )}
+                </TabsContent>
+              </Tabs>
               
               <div className="mt-6 pt-6 border-t border-border flex justify-between">
                 <Button

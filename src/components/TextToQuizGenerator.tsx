@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,12 +9,12 @@ import { FileText, PenTool, CheckSquare, List, Save, Loader2, Sparkles, FileChec
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { 
-  generateAIQuiz, 
   saveGeneratedQuiz, 
   GeneratedQuiz, 
   QuizQuestion 
 } from "@/services/quiz-generator";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { supabase } from "@/integrations/supabase/client";
 
 const QuizTypeOptions = [
   { value: "multiple-choice", label: "Multiple Choice", icon: CheckSquare },
@@ -56,15 +55,45 @@ export function TextToQuizGenerator() {
     setIsLoading(true);
     
     try {
-      // Mock the API call for demo purposes
-      // In a real implementation, you would call an external API
-      const mockQuestions = generateMockQuestions(parseInt(numQuestions), quizType);
+      // Check authentication
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.user) {
+        toast({
+          variant: "destructive",
+          title: "Authentication required",
+          description: "Please log in to generate quizzes"
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // Call our Supabase edge function to generate questions
+      const response = await fetch("/api/generate-quiz", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.session.access_token}`
+        },
+        body: JSON.stringify({
+          content,
+          title,
+          numQuestions: parseInt(numQuestions),
+          quizType
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to generate quiz");
+      }
+
+      const data = await response.json();
       
       const generatedQuiz: GeneratedQuiz = {
         id: crypto.randomUUID(),
         title: title,
         timestamp: new Date().toISOString(),
-        questions: mockQuestions
+        questions: data.questions
       };
       
       setPreviewQuiz(generatedQuiz);
@@ -75,12 +104,12 @@ export function TextToQuizGenerator() {
         description: `Your "${title}" quiz is ready to preview`
       });
     } catch (error) {
+      console.error("Quiz generation error:", error);
       toast({
         variant: "destructive",
         title: "Error generating quiz",
-        description: "There was a problem generating your quiz"
+        description: error instanceof Error ? error.message : "There was a problem generating your quiz"
       });
-      console.error("Quiz generation error:", error);
     } finally {
       setIsLoading(false);
     }
@@ -99,6 +128,32 @@ export function TextToQuizGenerator() {
     setIsSaving(true);
     
     try {
+      // Check authentication
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.user) {
+        toast({
+          variant: "destructive",
+          title: "Authentication required",
+          description: "Please log in to save quizzes"
+        });
+        setIsSaving(false);
+        return;
+      }
+
+      // Save quiz to database
+      const { error } = await supabase
+        .from("ai_quizzes")
+        .insert({
+          title: previewQuiz.title,
+          content: content,
+          questions: previewQuiz.questions,
+          quiz_type: quizType,
+          user_id: session.session.user.id
+        });
+        
+      if (error) throw error;
+      
+      // Also save to localStorage using existing function
       await saveGeneratedQuiz(previewQuiz);
       
       toast({
@@ -112,12 +167,12 @@ export function TextToQuizGenerator() {
       setPreviewQuiz(null);
       setShowPreview(false);
     } catch (error) {
+      console.error("Quiz save error:", error);
       toast({
         variant: "destructive",
         title: "Error saving quiz",
         description: "There was a problem saving your quiz"
       });
-      console.error("Quiz save error:", error);
     } finally {
       setIsSaving(false);
     }
@@ -170,85 +225,12 @@ export function TextToQuizGenerator() {
     );
   };
 
-  // Helper function to generate mock questions
-  function generateMockQuestions(count: number, type: string): QuizQuestion[] {
-    const questions: QuizQuestion[] = [];
-    
-    const bibleTopics = [
-      { topic: "Creation", book: "Genesis", chapter: 1 },
-      { topic: "Noah's Ark", book: "Genesis", chapter: 7 },
-      { topic: "Ten Commandments", book: "Exodus", chapter: 20 },
-      { topic: "David and Goliath", book: "1 Samuel", chapter: 17 },
-      { topic: "Sermon on the Mount", book: "Matthew", chapter: 5 },
-      { topic: "The Last Supper", book: "Luke", chapter: 22 },
-      { topic: "The Crucifixion", book: "John", chapter: 19 },
-      { topic: "The Resurrection", book: "Matthew", chapter: 28 },
-    ];
-    
-    for (let i = 0; i < count; i++) {
-      const topicIndex = Math.floor(Math.random() * bibleTopics.length);
-      const topic = bibleTopics[topicIndex];
-      
-      if (type === "multiple-choice") {
-        const options = [
-          `Answer option A for question ${i + 1}`,
-          `Answer option B for question ${i + 1}`,
-          `Answer option C for question ${i + 1}`,
-          `Answer option D for question ${i + 1}`
-        ];
-        const correctIndex = Math.floor(Math.random() * options.length);
-        
-        questions.push({
-          id: `q-${i + 1}`,
-          questionText: `Question ${i + 1} about ${topic.topic} from ${content.substring(0, 20)}...?`,
-          options: options,
-          correctAnswer: options[correctIndex],
-          explanation: `Explanation for question ${i + 1} about ${topic.topic}.`,
-          book: topic.book,
-          chapter: topic.chapter,
-          category: Math.random() > 0.5 ? "Old Testament" : "New Testament",
-          topic: topic.topic,
-          difficultyLevel: ['easy', 'medium', 'hard'][Math.floor(Math.random() * 3)]
-        });
-      } else if (type === "true-false") {
-        const isTrue = Math.random() > 0.5;
-        
-        questions.push({
-          id: `q-${i + 1}`,
-          questionText: `True or False: Statement ${i + 1} about ${topic.topic} from ${content.substring(0, 20)}...?`,
-          options: ["True", "False"],
-          correctAnswer: isTrue ? "True" : "False",
-          explanation: `This statement is ${isTrue ? "true" : "false"} because...`,
-          book: topic.book,
-          chapter: topic.chapter,
-          category: Math.random() > 0.5 ? "Old Testament" : "New Testament",
-          topic: topic.topic,
-          difficultyLevel: ['easy', 'medium', 'hard'][Math.floor(Math.random() * 3)]
-        });
-      } else {
-        questions.push({
-          id: `q-${i + 1}`,
-          questionText: `Fill in the blank: _____ ${i + 1} in the context of ${topic.topic} from ${content.substring(0, 20)}...`,
-          correctAnswer: `Word ${i + 1}`,
-          explanation: `The correct answer is "Word ${i + 1}" because...`,
-          book: topic.book,
-          chapter: topic.chapter,
-          category: Math.random() > 0.5 ? "Old Testament" : "New Testament",
-          topic: topic.topic,
-          difficultyLevel: ['easy', 'medium', 'hard'][Math.floor(Math.random() * 3)]
-        });
-      }
-    }
-    
-    return questions;
-  }
-
   return (
     <Card className="w-full border-coral/20 glass-card">
       <CardHeader>
         <CardTitle className="text-coral-light">Text to Quiz</CardTitle>
         <CardDescription>
-          Enter text content to create a custom quiz based on it
+          Enter text content to create a custom quiz based on it using AI
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
