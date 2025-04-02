@@ -11,13 +11,13 @@ export const BibleReaderAdapter: React.FC<BibleReaderAdapterProps> = ({
   onProgressUpdate, 
   onLoadingChange 
 }) => {
+  const [loading, setLoading] = useState(false);
+  
   const handleProgressUpdate = (book?: string, chapter?: number) => {
     if (onProgressUpdate) {
       onProgressUpdate(book, chapter);
     }
   };
-
-  const [loading, setLoading] = useState(false);
   
   const handleLoadingChange = (isLoading: boolean) => {
     setLoading(isLoading);
@@ -29,12 +29,12 @@ export const BibleReaderAdapter: React.FC<BibleReaderAdapterProps> = ({
   return (
     <div className="w-full">
       {loading && (
-        <div className="w-full py-4 text-center text-muted-foreground">
+        <div className="w-full py-4 text-center text-primary">
           Loading scripture...
         </div>
       )}
       <BibleReader 
-        onProgressUpdate={() => handleProgressUpdate()}
+        onProgressUpdate={handleProgressUpdate}
         onLoading={handleLoadingChange}  
       />
     </div>
