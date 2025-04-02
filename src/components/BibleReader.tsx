@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,16 +9,18 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
-interface BibleReaderProps {
+export interface BibleReaderProps {
   initialBook?: string;
   initialChapter?: number;
-  onProgressUpdate?: () => void;
+  onProgressUpdate?: (book?: string, chapter?: number) => void;
+  onLoading?: (isLoading: boolean) => void; 
 }
 
 export function BibleReader({ 
   initialBook = "John", 
   initialChapter = 1,
-  onProgressUpdate
+  onProgressUpdate,
+  onLoading
 }: BibleReaderProps) {
   const [selectedBook, setSelectedBook] = useState(initialBook);
   const [selectedChapter, setSelectedChapter] = useState(initialChapter);
@@ -29,10 +30,25 @@ export function BibleReader({
   const { toast } = useToast();
   const { user } = useAuth();
   
+  // Notify parent component about loading state
+  useEffect(() => {
+    if (onLoading) {
+      onLoading(true);
+    }
+    return () => {
+      if (onLoading) {
+        onLoading(false);
+      }
+    };
+  }, [onLoading]);
+  
   // Determine available books from the RSV Bible data
   const availableBooks = Object.keys(rsvBibleSample);
   
   useEffect(() => {
+    // Notify parent component about loading state
+    if (onLoading) onLoading(true);
+    
     // Load chapter content
     const chapter = getChapter(selectedBook, selectedChapter);
     
@@ -48,21 +64,35 @@ export function BibleReader({
             p => p.book === selectedBook && p.chapter === selectedChapter && p.completed
           );
           setIsChapterRead(isRead);
+          
+          // Loading complete
+          if (onLoading) onLoading(false);
         } catch (error) {
           console.error("Error checking read status:", error);
           setIsChapterRead(false);
+          
+          // Loading complete even on error
+          if (onLoading) onLoading(false);
         }
       };
       
       checkIfRead();
     } else {
       setChapterVerses([]);
+      
+      // Loading complete when no chapter is found
+      if (onLoading) onLoading(false);
     }
     
     // Update max chapters for the selected book
     const bookChapters = rsvBibleSample[selectedBook] || {};
     setMaxChapters(Object.keys(bookChapters).length);
-  }, [selectedBook, selectedChapter]);
+    
+    // Notify parent about progress update
+    if (onProgressUpdate) {
+      onProgressUpdate(selectedBook, selectedChapter);
+    }
+  }, [selectedBook, selectedChapter, onLoading, onProgressUpdate]);
   
   const handlePreviousChapter = () => {
     if (selectedChapter > 1) {

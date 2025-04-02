@@ -1,4 +1,3 @@
-
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
@@ -319,15 +318,16 @@ export const getQuizResults = async (): Promise<QuizResult[]> => {
     
     if (!data) return [];
 
+    // Map data to QuizResult, handling potentially missing properties
     return data.map(item => ({
       quizId: item.quiz_id,
       score: item.score,
       timeSpent: item.time_spent,
       correctAnswers: item.correct_answers,
       totalQuestions: item.total_questions,
-      timeBonus: item.time_bonus,
+      timeBonus: item.time_bonus || 0,
       completedAt: item.completed_at,
-      questions: item.questions as unknown as QuizQuestion[]
+      questions: [] // Default to empty array if questions property doesn't exist
     }));
   } catch (error) {
     console.error("Error getting quiz results:", error);

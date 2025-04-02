@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { BibleReader, BibleReaderProps } from '@/components/BibleReader';
+import { BibleReader } from '@/components/BibleReader';
 
 interface BibleReaderAdapterProps {
   onProgressUpdate?: (book?: string, chapter?: number) => void;
@@ -11,7 +11,7 @@ export const BibleReaderAdapter: React.FC<BibleReaderAdapterProps> = ({
   onProgressUpdate, 
   onLoadingChange 
 }) => {
-  const handleProgressUpdate: BibleReaderProps['onProgressUpdate'] = (book, chapter) => {
+  const handleProgressUpdate = (book?: string, chapter?: number) => {
     if (onProgressUpdate) {
       onProgressUpdate(book, chapter);
     }
@@ -34,7 +34,7 @@ export const BibleReaderAdapter: React.FC<BibleReaderAdapterProps> = ({
         </div>
       )}
       <BibleReader 
-        onProgressUpdate={handleProgressUpdate}
+        onProgressUpdate={() => handleProgressUpdate()}
         onLoading={handleLoadingChange}  
       />
     </div>

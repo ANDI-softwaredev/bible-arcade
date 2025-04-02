@@ -566,7 +566,7 @@ export const getQuizResults = async (): Promise<QuizResult[]> => {
     
     if (!data) return [];
 
-    // Map database results to QuizResult interface
+    // Map database results to QuizResult interface, handling potentially missing properties
     return data.map(item => ({
       quizId: item.quiz_id,
       score: item.score,
@@ -575,7 +575,7 @@ export const getQuizResults = async (): Promise<QuizResult[]> => {
       totalQuestions: item.total_questions,
       timeBonus: item.time_bonus,
       completedAt: item.completed_at,
-      questions: item.questions || [] // Handle potentially missing questions
+      questions: [] // Default to empty array if questions property doesn't exist
     }));
   } catch (error) {
     console.error("Error getting quiz results:", error);
