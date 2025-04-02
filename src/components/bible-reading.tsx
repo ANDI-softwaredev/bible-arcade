@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { ChevronDown, Book, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -48,7 +47,6 @@ export function BibleReading({ onReadComplete }: BibleReadingProps) {
     }
   };
   
-  // Fetch books on component mount
   useEffect(() => {
     const loadBooks = async () => {
       try {
@@ -56,7 +54,6 @@ export function BibleReading({ onReadComplete }: BibleReadingProps) {
         const allBooks = await getBibleBooks();
         setBooks(allBooks);
         
-        // Set first book as default
         if (allBooks.length > 0) {
           setSelectedBook(allBooks[0]);
         }
@@ -75,7 +72,6 @@ export function BibleReading({ onReadComplete }: BibleReadingProps) {
     loadBooks();
   }, [toast]);
   
-  // Fetch chapter content when book or chapter changes
   useEffect(() => {
     const loadChapter = async () => {
       if (!selectedBook) return;
@@ -100,12 +96,10 @@ export function BibleReading({ onReadComplete }: BibleReadingProps) {
     loadChapter();
   }, [selectedBook, selectedChapter, toast]);
   
-  // Handle chapter selection
   const handleChapterSelect = (chapterNum: number) => {
     setSelectedChapter(chapterNum);
   };
   
-  // Mark reading as complete
   const handleMarkComplete = () => {
     if (selectedBook) {
       try {
@@ -130,16 +124,14 @@ export function BibleReading({ onReadComplete }: BibleReadingProps) {
     }
   };
   
-  // Handle book selection from dropdown
   const handleBookSelect = (bookId: string) => {
     const book = books.find(b => b.id === bookId);
     if (book) {
       setSelectedBook(book);
-      setSelectedChapter(1); // Reset to chapter 1 when book changes
+      setSelectedChapter(1);
     }
   };
   
-  // Filter books by testament
   const oldTestament = books.filter(book => book.testament === "OT");
   const newTestament = books.filter(book => book.testament === "NT");
   
@@ -196,7 +188,6 @@ export function BibleReading({ onReadComplete }: BibleReadingProps) {
         <div className="glass-card rounded-lg p-4">
           <h2 className="text-lg font-semibold mb-4">Browse Bible</h2>
           
-          {/* Old Testament */}
           <Collapsible 
             open={expandedBooks.includes("old-testament")}
             onOpenChange={() => toggleBookExpansion("old-testament")}
@@ -228,7 +219,6 @@ export function BibleReading({ onReadComplete }: BibleReadingProps) {
             </CollapsibleContent>
           </Collapsible>
           
-          {/* New Testament */}
           <Collapsible 
             open={expandedBooks.includes("new-testament")}
             onOpenChange={() => toggleBookExpansion("new-testament")}
@@ -277,7 +267,10 @@ export function BibleReading({ onReadComplete }: BibleReadingProps) {
               </div>
               
               <div className="bible-reader-container prose dark:prose-invert max-w-none">
-                <BibleReader content={chapterContent} />
+                <BibleReader 
+                  initialBook={selectedBook?.name}
+                  initialChapter={selectedChapter}
+                />
               </div>
               
               <div className="mt-6 pt-6 border-t border-border flex justify-between">
