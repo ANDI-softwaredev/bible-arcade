@@ -1,3 +1,4 @@
+
 // Import necessary libraries
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
@@ -50,6 +51,24 @@ export interface BibleVerse {
   content: string;
   reference: string;
   verseNumber: string;
+}
+
+// Additional types needed by other components
+export type BibleAPIBook = BibleBook;
+
+export interface ReadingProgress {
+  book: string;
+  chapter: number;
+  lastRead: string;
+  completed: boolean;
+}
+
+export interface JournalEntry {
+  id: string;
+  book: string;
+  chapter: number;
+  content: string;
+  lastModified: string;
 }
 
 // Get all books of the Bible
@@ -186,7 +205,7 @@ export const getVersesByTopic = async (
   return await searchBible(bibleId, topic, limit);
 };
 
-// Add these functions to fix the error
+// Mock data for quiz results
 export const getQuizResults = async () => {
   return [
     {
@@ -212,13 +231,15 @@ export const getQuizResults = async () => {
   ];
 };
 
+// Mock data for study duration
 export const getStudyDuration = async () => {
   return [
     {
       duration: 30,
       timestamp: new Date().toISOString(),
       book: "Genesis",
-      chapter: 1
+      chapter: 1,
+      score: 85 // Added for analytics
     }
   ];
 };
@@ -268,4 +289,86 @@ export const getPopularPassages = async (): Promise<any[]> => {
     { reference: "Philippians 4:13", count: 720 },
     { reference: "Jeremiah 29:11", count: 680 }
   ];
+};
+
+// Additional functions needed by components
+export const getAllBooks = async (): Promise<BibleAPIBook[]> => {
+  // Use the existing getBibleBooks function and just rename output
+  return await getBibleBooks();
+};
+
+export const saveReadingProgress = async (book: string, chapter: number): Promise<boolean> => {
+  // Mock implementation to save reading progress
+  console.log(`Saved reading progress for ${book} ${chapter}`);
+  return true;
+};
+
+export const getAllReadingProgress = async (): Promise<ReadingProgress[]> => {
+  // Mock implementation
+  return [
+    {
+      book: "Genesis",
+      chapter: 1,
+      lastRead: new Date().toISOString(),
+      completed: true
+    },
+    {
+      book: "Genesis",
+      chapter: 2,
+      lastRead: new Date().toISOString(),
+      completed: true
+    },
+    {
+      book: "Exodus",
+      chapter: 1,
+      lastRead: new Date().toISOString(),
+      completed: true
+    }
+  ];
+};
+
+export const getChapterJournal = async (book: string, chapter: number): Promise<string> => {
+  // Mock implementation
+  return `My notes on ${book} ${chapter}. This is a great passage about...`;
+};
+
+export const saveChapterJournal = async (book: string, chapter: number, content: string): Promise<boolean> => {
+  // Mock implementation
+  console.log(`Saved journal for ${book} ${chapter}: ${content.substring(0, 20)}...`);
+  return true;
+};
+
+export const getAllJournalEntries = async (): Promise<JournalEntry[]> => {
+  // Mock implementation
+  return [
+    {
+      id: uuidv4(),
+      book: "John",
+      chapter: 3,
+      content: "This chapter includes the famous John 3:16 verse.",
+      lastModified: new Date().toISOString()
+    },
+    {
+      id: uuidv4(),
+      book: "Psalms",
+      chapter: 23,
+      content: "The Lord is my shepherd...",
+      lastModified: new Date().toISOString()
+    }
+  ];
+};
+
+export const calculateOverallProgress = async (): Promise<number> => {
+  // Mock implementation - return percentage between 0-100
+  return 45;
+};
+
+export const calculateTestamentProgress = async (testament: 'OT' | 'NT'): Promise<number> => {
+  // Mock implementation - return percentage between 0-100
+  return testament === 'OT' ? 35 : 60;
+};
+
+export const getCompletedBooks = async (): Promise<string[]> => {
+  // Mock implementation
+  return ["John", "Mark", "1 John", "Jude"];
 };
