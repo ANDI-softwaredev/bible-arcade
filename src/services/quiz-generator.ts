@@ -1,3 +1,4 @@
+
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
@@ -195,6 +196,7 @@ export const saveGeneratedQuiz = async (quiz: GeneratedQuiz): Promise<void> => {
     // Convert QuizQuestion[] to Json type by using JSON.stringify and then parsing
     const jsonQuestions = JSON.parse(JSON.stringify(quiz.questions)) as Json;
     
+    // Use generated_quizzes table for TypeScript compatibility
     await supabase
       .from('generated_quizzes')
       .insert({

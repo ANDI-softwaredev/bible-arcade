@@ -37,9 +37,10 @@ export function BibleJournal({ book, chapter }: BibleJournalProps) {
           return;
         }
         
+        // Use journal_entries instead of journals for TypeScript compatibility
         const { data, error } = await supabase
-          .from("journals")
-          .select("notes, updated_at")
+          .from("journal_entries")
+          .select("text, last_updated")
           .eq("book", book)
           .eq("chapter", chapter)
           .eq("user_id", session.session.user.id)
@@ -48,8 +49,8 @@ export function BibleJournal({ book, chapter }: BibleJournalProps) {
         if (error) throw error;
         
         if (data) {
-          setNotes(data.notes || "");
-          setLastSaved(new Date(data.updated_at).toLocaleString());
+          setNotes(data.text || "");
+          setLastSaved(new Date(data.last_updated).toLocaleString());
         } else {
           setNotes("");
           setLastSaved(null);
@@ -85,7 +86,7 @@ export function BibleJournal({ book, chapter }: BibleJournalProps) {
       
       // Check if journal entry already exists
       const { data: existingEntry } = await supabase
-        .from("journals")
+        .from("journal_entries")
         .select("id")
         .eq("book", book)
         .eq("chapter", chapter)
@@ -97,20 +98,20 @@ export function BibleJournal({ book, chapter }: BibleJournalProps) {
       if (existingEntry) {
         // Update existing journal entry
         result = await supabase
-          .from("journals")
+          .from("journal_entries")
           .update({
-            notes,
-            updated_at: new Date().toISOString()
+            text: notes,
+            last_updated: new Date().toISOString()
           })
           .eq("id", existingEntry.id);
       } else {
         // Create new journal entry
         result = await supabase
-          .from("journals")
+          .from("journal_entries")
           .insert({
             book,
             chapter,
-            notes,
+            text: notes,
             user_id: session.session.user.id
           });
       }

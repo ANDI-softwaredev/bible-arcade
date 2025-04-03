@@ -48,9 +48,9 @@ const BibleStudy = () => {
       
       if (readingError) throw readingError;
       
-      // Get journal entries count
+      // Get journal entries count - use journal_entries instead of journals
       const { count: journalCount, error: journalError } = await supabase
-        .from('journals')
+        .from('journal_entries')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', session.session.user.id);
       

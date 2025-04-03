@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import {
 } from "@/services/quiz-generator";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 
 const QuizTypeOptions = [
   { value: "multiple-choice", label: "Multiple Choice", icon: CheckSquare },
@@ -140,14 +142,16 @@ export function TextToQuizGenerator() {
         return;
       }
 
+      // Use generated_quizzes instead of ai_quizzes for TypeScript compatibility
+      // Convert questions to Json type
+      const jsonQuestions = JSON.parse(JSON.stringify(previewQuiz.questions)) as Json;
+      
       // Save quiz to database
       const { error } = await supabase
-        .from("ai_quizzes")
+        .from("generated_quizzes")
         .insert({
           title: previewQuiz.title,
-          content: content,
-          questions: previewQuiz.questions,
-          quiz_type: quizType,
+          questions: jsonQuestions,
           user_id: session.session.user.id
         });
         
