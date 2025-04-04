@@ -1,4 +1,3 @@
-
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
@@ -51,14 +50,12 @@ export interface StudySession {
   score?: number; // If associated with a quiz
 }
 
-// Function to extract text from a PDF file
 export const extractPdfText = async (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     
     reader.onload = async function (event) {
       try {
-        // Dynamically import pdfjsLib
         const pdfjsLib = await import('pdfjs-dist');
         pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
         
@@ -89,7 +86,6 @@ export const extractPdfText = async (file: File): Promise<string> => {
   });
 };
 
-// Function to generate a quiz using AI
 export const generateAIQuiz = async (params: {
   content: string;
   title: string;
@@ -113,14 +109,12 @@ export const generateAIQuiz = async (params: {
 
     const quiz = await response.json();
     
-    // If timed option is set, assign time limits and points based on difficulty
     if (params.timed && quiz.questions) {
       quiz.questions = quiz.questions.map((question: QuizQuestion) => {
         const difficultyLevel = question.difficultyLevel || 'easy-to-go';
         
-        // Assign time limits and points based on difficulty
-        let timeLimit = 5; // default
-        let points = 5; // default
+        let timeLimit = 5;
+        let points = 5;
         
         switch (difficultyLevel) {
           case 'easy-to-go':
@@ -153,7 +147,6 @@ export const generateAIQuiz = async (params: {
       });
     }
 
-    // Extract categories and topics
     const categories = new Set<string>();
     const topics = new Set<string>();
     const difficultyLevels = new Set<string>();
@@ -185,7 +178,6 @@ export const saveGeneratedQuiz = async (quiz: GeneratedQuiz): Promise<void> => {
     const user = session?.session?.user;
 
     if (!user) {
-      // Fallback to localStorage if not authenticated
       const existingQuizzes = localStorage.getItem('generated-quizzes');
       const quizzes: GeneratedQuiz[] = existingQuizzes ? JSON.parse(existingQuizzes) : [];
       quizzes.push(quiz);
@@ -193,10 +185,8 @@ export const saveGeneratedQuiz = async (quiz: GeneratedQuiz): Promise<void> => {
       return;
     }
 
-    // Convert QuizQuestion[] to Json type by using JSON.stringify and then parsing
     const jsonQuestions = JSON.parse(JSON.stringify(quiz.questions)) as Json;
     
-    // Use generated_quizzes table for TypeScript compatibility
     await supabase
       .from('generated_quizzes')
       .insert({
@@ -216,7 +206,6 @@ export const getSavedGeneratedQuizzes = async (): Promise<GeneratedQuiz[]> => {
     const user = session?.session?.user;
 
     if (!user) {
-      // Fallback to localStorage if not authenticated
       const existingQuizzes = localStorage.getItem('generated-quizzes');
       return existingQuizzes ? JSON.parse(existingQuizzes) : [];
     }
@@ -229,7 +218,6 @@ export const getSavedGeneratedQuizzes = async (): Promise<GeneratedQuiz[]> => {
     
     if (!data) return [];
 
-    // Safely convert data from Json to QuizQuestion[]
     return data.map(item => ({
       id: item.id,
       title: item.title,
@@ -248,19 +236,77 @@ export const saveQuizResult = async (result: QuizResult): Promise<void> => {
     const user = session?.session?.user;
 
     if (!user) {
-      // Skip saving quiz results if not authenticated
       return;
     }
 
-    // Add timestamp if not provided
     if (!result.completedAt) {
       result.completedAt = new Date().toISOString();
     }
     
-    // Convert question results to Json
+    const categories: Record<string, { correct: number, total: number }> = {};
+    const topics: Record<string, { correct: number, total: number }> = {};
+    const books: Record<string, { correct: number, total: number }> = {};
+    
+    if (result.questions) {
+      result.questions.forEach(q => {
+        if (q.category) {
+          if (!categories[q.category]) {
+            categories[q.category] = { correct: 0, total: 0 };
+          }
+          categories[q.category].total++;
+          if (q.isCorrect) {
+            categories[q.category].correct++;
+          }
+        }
+        
+        if (q.topic) {
+          if (!topics[q.topic]) {
+            topics[q.topic] = { correct: 0, total: 0 };
+          }
+          topics[q.topic].total++;
+          if (q.isCorrect) {
+            topics[q.topic].correct++;
+          }
+        }
+        
+        if (q.book) {
+          if (!books[q.book]) {
+            books[q.book] = { correct: 0, total: 0 };
+          }
+          books[q.book].total++;
+          if (q.isCorrect) {
+            books[q.book].correct++;
+          }
+        }
+      });
+    }
+    
+    const performanceMetrics = {
+      categories: Object.entries(categories).map(([name, stats]) => ({
+        name,
+        correct: stats.correct,
+        total: stats.total,
+        percentage: Math.round((stats.correct / stats.total) * 100)
+      })),
+      topics: Object.entries(topics).map(([name, stats]) => ({
+        name,
+        correct: stats.correct,
+        total: stats.total,
+        percentage: Math.round((stats.correct / stats.total) * 100)
+      })),
+      books: Object.entries(books).map(([name, stats]) => ({
+        name,
+        correct: stats.correct,
+        total: stats.total,
+        percentage: Math.round((stats.correct / stats.total) * 100)
+      }))
+    };
+    
     const jsonQuestions = result.questions ? 
       JSON.parse(JSON.stringify(result.questions)) as Json : 
       null;
+    
+    const jsonMetrics = JSON.parse(JSON.stringify(performanceMetrics)) as Json;
 
     await supabase
       .from('quiz_results')
@@ -273,21 +319,20 @@ export const saveQuizResult = async (result: QuizResult): Promise<void> => {
         total_questions: result.totalQuestions,
         time_bonus: result.timeBonus,
         completed_at: result.completedAt,
-        questions: jsonQuestions
+        questions: jsonQuestions,
+        performance_metrics: jsonMetrics
       });
   } catch (error) {
     console.error("Error saving quiz result:", error);
   }
 };
 
-// Get all quiz results for the current user
 export const getQuizResults = async (): Promise<QuizResult[]> => {
   try {
     const { data: session } = await supabase.auth.getSession();
     const user = session?.session?.user;
 
     if (!user) {
-      // Return mock data if not authenticated
       return [
         {
           quizId: "mock-1",
@@ -320,7 +365,6 @@ export const getQuizResults = async (): Promise<QuizResult[]> => {
     
     if (!data) return [];
 
-    // Map data to QuizResult, handling potentially missing properties
     return data.map(item => ({
       quizId: item.quiz_id,
       score: item.score,
@@ -329,7 +373,7 @@ export const getQuizResults = async (): Promise<QuizResult[]> => {
       totalQuestions: item.total_questions,
       timeBonus: item.time_bonus || 0,
       completedAt: item.completed_at,
-      questions: [] // Default to empty array if questions property doesn't exist
+      questions: []
     }));
   } catch (error) {
     console.error("Error getting quiz results:", error);
@@ -337,18 +381,15 @@ export const getQuizResults = async (): Promise<QuizResult[]> => {
   }
 };
 
-// Save study duration data
 export const saveStudyDuration = async (session: StudySession): Promise<void> => {
   try {
     const { data: authSession } = await supabase.auth.getSession();
     const user = authSession?.session?.user;
 
     if (!user) {
-      // Skip saving if not authenticated
       return;
     }
 
-    // Save to local storage for now (would need a new table to store properly)
     const existingSessions = localStorage.getItem('study-sessions');
     const sessions: StudySession[] = existingSessions ? JSON.parse(existingSessions) : [];
     sessions.push({
@@ -361,19 +402,16 @@ export const saveStudyDuration = async (session: StudySession): Promise<void> =>
   }
 };
 
-// Get study duration data
 export const getStudyDuration = async (): Promise<StudySession[]> => {
   try {
     const { data: session } = await supabase.auth.getSession();
     const user = session?.session?.user;
 
     if (!user) {
-      // Return from localStorage if not authenticated
       const existingSessions = localStorage.getItem('study-sessions');
       return existingSessions ? JSON.parse(existingSessions) : [];
     }
 
-    // For now, return from localStorage (would need a proper table setup)
     const existingSessions = localStorage.getItem('study-sessions');
     return existingSessions ? JSON.parse(existingSessions) : [];
   } catch (error) {

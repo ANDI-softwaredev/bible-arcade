@@ -215,6 +215,7 @@ export function BibleQuiz({ onComplete }: BibleQuizProps) {
     }
     
     let calculatedScore = 0;
+    let totalPointsPossible = 0;
     
     const questionResults = currentQuestions.map(question => {
       const userAnswer = userAnswers[question.id] || "";
@@ -222,6 +223,7 @@ export function BibleQuiz({ onComplete }: BibleQuizProps) {
       const pointsEarned = isCorrect ? question.points : 0;
       
       calculatedScore += pointsEarned;
+      totalPointsPossible += question.points || 0;
       
       return {
         questionId: question.id,
@@ -238,25 +240,38 @@ export function BibleQuiz({ onComplete }: BibleQuizProps) {
     const percentageScore = Math.round((calculatedScore / totalPossible) * 100);
     
     // Record individual question performance for analysis
-    const questionResultsWithIsCorrect = currentQuestions.map(question => {
+    const questionResultsWithDetails = currentQuestions.map(question => {
       const userAnswer = userAnswers[question.id] || "";
       const isCorrect = userAnswer === question.correctAnswer;
       
       return {
         ...question,
-        isCorrect
+        isCorrect,
+        userAnswer,
+        answeredCorrectly: isCorrect,
+        timeSpent: question.timeLimit ? (question.timeLimit - timeRemaining) : null
       };
     });
+    
+    // Extract categories, topics, and books from questions
+    const categories = [...new Set(currentQuestions.filter(q => q.category).map(q => q.category))];
+    const topics = [...new Set(currentQuestions.filter(q => q.topic).map(q => q.topic))];
+    
+    // Calculate time spent (actual time or estimated from question timers)
+    const quizStartTime = new Date().getTime() - getQuizDuration() * 1000;
+    const timeSpent = Math.round((new Date().getTime() - quizStartTime) / 1000);
     
     // Save comprehensive quiz result for analytics
     saveQuizResult({
       quizId: `quiz-${Date.now()}`,
       score: calculatedScore,
-      timeSpent: getQuizDuration(),
-      correctAnswers: questionResultsWithIsCorrect.filter(q => q.isCorrect).length,
-      totalQuestions: questionResultsWithIsCorrect.length,
+      timeSpent: timeSpent,
+      correctAnswers: questionResultsWithDetails.filter(q => q.isCorrect).length,
+      totalQuestions: questionResultsWithDetails.length,
       timeBonus: 0, // If implemented
-      questions: questionResultsWithIsCorrect,
+      questions: questionResultsWithDetails,
+      categories: categories,
+      topics: topics,
       completedAt: new Date().toISOString()
     });
     

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +30,8 @@ export interface LearningPlanData {
     lastAttempts: number[];
     strengths: string[];
     weaknesses: string[];
+    weaknessTopics: string[]; // Add a list of specific topics to focus on
+    recentlyImproved: string[]; // Add topics that show recent improvement
   };
   nextMilestone: {
     description: string;
@@ -214,41 +215,88 @@ export function LearningPlanGenerator() {
     return weaknessBooks.slice(0, 3); // Return top 3 weakness books
   };
   
-  // Analyze quiz scores
+  // Analyze quiz scores - enhanced with performance metrics
   const analyzeQuizScores = (quizResults) => {
     if (!quizResults || quizResults.length === 0) {
       return {
         average: 75,
         lastAttempts: [75, 82, 68, 90],
         strengths: ["Old Testament History", "Psalms", "Gospels"],
-        weaknesses: ["Prophets", "Epistles", "Revelation"]
+        weaknesses: ["Prophets", "Epistles", "Revelation"],
+        weaknessTopics: ["End Times", "Genealogies", "Levitical Law"],
+        recentlyImproved: []
       };
     }
     
     // Calculate real quiz performance
     const scores = quizResults.map(result => 
-      Math.round((result.score / result.totalPossible) * 100)
+      Math.round((result.score / result.totalQuestions) * 100)
     );
     
     const average = scores.reduce((sum, score) => sum + score, 0) / scores.length;
     
-    // Analyze question categories
-    const categoryPerformance = {};
+    // Extract performance metrics if available
+    let categoryPerformance = {};
+    let topicPerformance = {};
+    
     quizResults.forEach(result => {
-      if (!result.questions) return;
-      
-      result.questions.forEach(question => {
-        if (!question.category) return;
-        
-        if (!categoryPerformance[question.category]) {
-          categoryPerformance[question.category] = { correct: 0, total: 0 };
+      // Use performance_metrics if available
+      if (result.performance_metrics) {
+        if (result.performance_metrics.categories) {
+          result.performance_metrics.categories.forEach(category => {
+            if (!categoryPerformance[category.name]) {
+              categoryPerformance[category.name] = { correct: 0, total: 0, recent: [] };
+            }
+            categoryPerformance[category.name].correct += category.correct;
+            categoryPerformance[category.name].total += category.total;
+            categoryPerformance[category.name].recent.push({
+              date: result.completedAt,
+              percentage: category.percentage
+            });
+          });
         }
         
-        categoryPerformance[question.category].total++;
-        if (question.isCorrect) {
-          categoryPerformance[question.category].correct++;
+        if (result.performance_metrics.topics) {
+          result.performance_metrics.topics.forEach(topic => {
+            if (!topicPerformance[topic.name]) {
+              topicPerformance[topic.name] = { correct: 0, total: 0, recent: [] };
+            }
+            topicPerformance[topic.name].correct += topic.correct;
+            topicPerformance[topic.name].total += topic.total;
+            topicPerformance[topic.name].recent.push({
+              date: result.completedAt,
+              percentage: topic.percentage
+            });
+          });
         }
-      });
+      } else {
+        // Fall back to analyzing individual questions
+        if (!result.questions) return;
+        
+        result.questions.forEach(question => {
+          if (question.category) {
+            if (!categoryPerformance[question.category]) {
+              categoryPerformance[question.category] = { correct: 0, total: 0, recent: [] };
+            }
+            
+            categoryPerformance[question.category].total++;
+            if (question.isCorrect) {
+              categoryPerformance[question.category].correct++;
+            }
+          }
+          
+          if (question.topic) {
+            if (!topicPerformance[question.topic]) {
+              topicPerformance[question.topic] = { correct: 0, total: 0, recent: [] };
+            }
+            
+            topicPerformance[question.topic].total++;
+            if (question.isCorrect) {
+              topicPerformance[question.topic].correct++;
+            }
+          }
+        });
+      }
     });
     
     // Calculate percentage for each category
@@ -257,16 +305,45 @@ export function LearningPlanGenerator() {
       categoryScores[category] = (data.correct / data.total) * 100;
     });
     
+    // Calculate percentage for each topic
+    const topicScores = {};
+    Object.entries(topicPerformance).forEach(([topic, data]: [string, any]) => {
+      topicScores[topic] = (data.correct / data.total) * 100;
+    });
+    
     // Sort categories by performance
     const sortedCategories = Object.entries(categoryScores)
       .sort(([_, a], [__, b]) => (b as number) - (a as number))
       .map(([category]) => category);
     
+    // Sort topics by performance
+    const sortedTopics = Object.entries(topicScores)
+      .sort(([_, a], [__, b]) => (a as number) - (b as number))
+      .map(([topic]) => topic);
+    
+    // Find topics that show recent improvement
+    const improvedTopics = [];
+    Object.entries(topicPerformance).forEach(([topic, data]: [string, any]) => {
+      if (data.recent && data.recent.length >= 2) {
+        // Sort by date, oldest first
+        const sorted = [...data.recent].sort((a, b) => 
+          new Date(a.date).getTime() - new Date(b.date).getTime()
+        );
+        
+        // Check if there's improvement
+        if (sorted[sorted.length - 1].percentage > sorted[0].percentage + 10) {
+          improvedTopics.push(topic);
+        }
+      }
+    });
+    
     return {
       average,
       lastAttempts: scores.slice(-4), // Get the last 4 attempts
       strengths: sortedCategories.slice(0, 3),
-      weaknesses: sortedCategories.reverse().slice(0, 3)
+      weaknesses: sortedCategories.reverse().slice(0, 3),
+      weaknessTopics: sortedTopics.slice(0, 3),
+      recentlyImproved: improvedTopics.slice(0, 3)
     };
   };
   
