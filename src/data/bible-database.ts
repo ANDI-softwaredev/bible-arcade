@@ -42,6 +42,10 @@ export interface QuizQuestion {
   type: QuestionType;
   points: number;
   timeLimit?: number; // Time limit in seconds
+  category?: string; // Adding category property
+  topic?: string; // Adding topic property
+  isCorrect?: boolean; // Was this question answered correctly
+  userAnswer?: string; // User's answer to this question
 }
 
 // Quiz attempt model
@@ -84,7 +88,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "easy-to-go",
     type: "multiple-choice",
     points: 5,
-    timeLimit: 5
+    timeLimit: 5,
+    category: "Creation",
+    topic: "Bible Basics"
   },
   {
     id: "gen-6-1",
@@ -98,7 +104,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "minimum-thinking",
     type: "multiple-choice",
     points: 10,
-    timeLimit: 7
+    timeLimit: 7,
+    category: "Noah's Ark",
+    topic: "Bible Stories"
   },
   // Exodus
   {
@@ -113,7 +121,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "easy-to-go",
     type: "multiple-choice",
     points: 5,
-    timeLimit: 5
+    timeLimit: 5,
+    category: "Commandments",
+    topic: "Bible Basics"
   },
   // Matthew
   {
@@ -128,7 +138,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "minimum-thinking",
     type: "multiple-choice",
     points: 10,
-    timeLimit: 7
+    timeLimit: 7,
+    category: "Beatitudes",
+    topic: "Bible Stories"
   },
   {
     id: "mat-6-9",
@@ -143,7 +155,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "easy-to-go",
     type: "multiple-choice",
     points: 5,
-    timeLimit: 5
+    timeLimit: 5,
+    category: "Lord's Prayer",
+    topic: "Bible Basics"
   },
   // John
   {
@@ -159,7 +173,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "easy-to-go",
     type: "multiple-choice",
     points: 5,
-    timeLimit: 5
+    timeLimit: 5,
+    category: "John 3:16",
+    topic: "Bible Stories"
   },
   // Romans
   {
@@ -173,7 +189,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "minimum-thinking",
     type: "fill-in-blank",
     points: 10,
-    timeLimit: 7
+    timeLimit: 7,
+    category: "Romans 3:23",
+    topic: "Bible Basics"
   },
   // Acts
   {
@@ -188,7 +206,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "minimum-thinking",
     type: "multiple-choice",
     points: 10,
-    timeLimit: 7
+    timeLimit: 7,
+    category: "Holy Spirit",
+    topic: "Bible Stories"
   },
   // Numbers (Easy to Go)
   {
@@ -204,7 +224,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "easy-to-go",
     type: "multiple-choice",
     points: 5,
-    timeLimit: 5
+    timeLimit: 5,
+    category: "Numbers 1:1",
+    topic: "Bible Stories"
   },
   {
     id: "num-6-1",
@@ -219,7 +241,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "easy-to-go",
     type: "multiple-choice",
     points: 5,
-    timeLimit: 5
+    timeLimit: 5,
+    category: "Nazirite Vow",
+    topic: "Bible Stories"
   },
   
   // Numbers (Minimum Thinking)
@@ -235,7 +259,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "minimum-thinking",
     type: "multiple-choice",
     points: 10,
-    timeLimit: 7
+    timeLimit: 7,
+    category: "Spies",
+    topic: "Bible Stories"
   },
   {
     id: "num-20-1",
@@ -250,7 +276,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "minimum-thinking",
     type: "multiple-choice",
     points: 10,
-    timeLimit: 7
+    timeLimit: 7,
+    category: "Water from Rock",
+    topic: "Bible Stories"
   },
   
   // Numbers (Maximum Thinking)
@@ -266,7 +294,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "maximum-thinking",
     type: "multiple-choice",
     points: 15,
-    timeLimit: 10
+    timeLimit: 10,
+    category: "Balaam's Donkey",
+    topic: "Bible Stories"
   },
   {
     id: "num-26-1",
@@ -280,7 +310,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "maximum-thinking",
     type: "multiple-choice",
     points: 15,
-    timeLimit: 10
+    timeLimit: 10,
+    category: "Second Census",
+    topic: "Bible Stories"
   },
   
   // Numbers (Crack My Head)
@@ -296,7 +328,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "crack-my-head",
     type: "multiple-choice",
     points: 20,
-    timeLimit: 15
+    timeLimit: 15,
+    category: "Moses' War",
+    topic: "Bible Stories"
   },
   {
     id: "num-33-1",
@@ -310,7 +344,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "crack-my-head",
     type: "multiple-choice",
     points: 20,
-    timeLimit: 15
+    timeLimit: 15,
+    category: "Camping Locations",
+    topic: "Bible Stories"
   },
 
   // Numbers (Granite Hard)
@@ -326,7 +362,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "granite-hard",
     type: "multiple-choice",
     points: 25,
-    timeLimit: 20
+    timeLimit: 20,
+    category: "Tribal Leaders",
+    topic: "Bible Stories"
   },
   
   // Hebrews (Easy to Go)
@@ -343,7 +381,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "easy-to-go",
     type: "multiple-choice",
     points: 5,
-    timeLimit: 5
+    timeLimit: 5,
+    category: "Hebrews 1:1",
+    topic: "Bible Basics"
   },
   {
     id: "heb-11-1",
@@ -363,7 +403,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "easy-to-go",
     type: "multiple-choice",
     points: 5,
-    timeLimit: 5
+    timeLimit: 5,
+    category: "Hebrews 11:1",
+    topic: "Bible Basics"
   },
   
   // Hebrews (Minimum Thinking)
@@ -379,7 +421,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "minimum-thinking",
     type: "multiple-choice",
     points: 10,
-    timeLimit: 7
+    timeLimit: 7,
+    category: "Hebrews 4:12",
+    topic: "Bible Basics"
   },
   {
     id: "heb-5-1",
@@ -393,7 +437,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "minimum-thinking",
     type: "multiple-choice",
     points: 10,
-    timeLimit: 7
+    timeLimit: 7,
+    category: "Hebrews 5:6",
+    topic: "Bible Basics"
   },
   
   // Hebrews (Maximum Thinking)
@@ -414,7 +460,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "maximum-thinking",
     type: "multiple-choice",
     points: 15,
-    timeLimit: 10
+    timeLimit: 10,
+    category: "Hebrews 6:17-18",
+    topic: "Bible Basics"
   },
   
   // Hebrews (Crack My Head)
@@ -435,7 +483,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "crack-my-head",
     type: "multiple-choice",
     points: 20,
-    timeLimit: 15
+    timeLimit: 15,
+    category: "Ark of the Covenant",
+    topic: "Bible Stories"
   },
   
   // Hebrews (Granite Hard)
@@ -451,7 +501,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "granite-hard",
     type: "multiple-choice",
     points: 25,
-    timeLimit: 20
+    timeLimit: 20,
+    category: "Abraham's Gifts",
+    topic: "Bible Stories"
   },
   
   // Ezra (Easy to Go)
@@ -467,7 +519,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "easy-to-go",
     type: "multiple-choice",
     points: 5,
-    timeLimit: 5
+    timeLimit: 5,
+    category: "Ezra 1:1",
+    topic: "Bible Stories"
   },
   
   // Ezra (Minimum Thinking)
@@ -483,7 +537,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "minimum-thinking",
     type: "multiple-choice",
     points: 10,
-    timeLimit: 7
+    timeLimit: 7,
+    category: "Ezra 3:2",
+    topic: "Bible Stories"
   },
   
   // Ezra (Maximum Thinking)
@@ -499,7 +555,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "maximum-thinking",
     type: "multiple-choice",
     points: 15,
-    timeLimit: 10
+    timeLimit: 10,
+    category: "Ezra 6:15",
+    topic: "Bible Stories"
   },
   
   // Ezra (Crack My Head)
@@ -515,7 +573,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "crack-my-head",
     type: "multiple-choice",
     points: 20,
-    timeLimit: 15
+    timeLimit: 15,
+    category: "Ezra 7",
+    topic: "Bible Stories"
   },
   
   // Ezra (Granite Hard)
@@ -531,7 +591,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "granite-hard",
     type: "multiple-choice",
     points: 25,
-    timeLimit: 20
+    timeLimit: 20,
+    category: "Ezra 10",
+    topic: "Bible Stories"
   },
   
   // Mark (Easy to Go)
@@ -547,7 +609,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "easy-to-go",
     type: "multiple-choice",
     points: 5,
-    timeLimit: 5
+    timeLimit: 5,
+    category: "John the Baptist",
+    topic: "Bible Stories"
   },
   {
     id: "mrk-4-1",
@@ -566,7 +630,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "easy-to-go",
     type: "multiple-choice",
     points: 5,
-    timeLimit: 5
+    timeLimit: 5,
+    category: "Mark 4:30-32",
+    topic: "Bible Stories"
   },
   
   // Mark (Minimum Thinking)
@@ -582,7 +648,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "minimum-thinking",
     type: "multiple-choice",
     points: 10,
-    timeLimit: 7
+    timeLimit: 7,
+    category: "Mark 5:13",
+    topic: "Bible Stories"
   },
   
   // Mark (Maximum Thinking)
@@ -598,7 +666,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "maximum-thinking",
     type: "multiple-choice",
     points: 15,
-    timeLimit: 10
+    timeLimit: 10,
+    category: "Mark 14:58",
+    topic: "Bible Stories"
   },
   
   // Mark (Crack My Head)
@@ -614,7 +684,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "crack-my-head",
     type: "multiple-choice",
     points: 20,
-    timeLimit: 15
+    timeLimit: 15,
+    category: "Mark 12:41-44",
+    topic: "Bible Stories"
   },
   
   // Mark (Granite Hard)
@@ -635,7 +707,9 @@ export const quizQuestions: QuizQuestion[] = [
     difficultyLevel: "granite-hard",
     type: "multiple-choice",
     points: 25,
-    timeLimit: 20
+    timeLimit: 20,
+    category: "Mark 16:17-18",
+    topic: "Bible Stories"
   }
 ];
 

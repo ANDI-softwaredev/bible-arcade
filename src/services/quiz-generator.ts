@@ -17,6 +17,7 @@ export interface QuizQuestion {
   category?: string; // Question category (e.g., "Old Testament History", "Gospel", "Epistles")
   topic?: string; // Specific topic (e.g., "Creation", "Sermon on the Mount")
   isCorrect?: boolean; // Was this question answered correctly
+  userAnswer?: string; // User's answer to this question
 }
 
 export interface GeneratedQuiz {

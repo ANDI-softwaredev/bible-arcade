@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1"
 import { v4 as uuidv4 } from "https://esm.sh/uuid@11.0.0"
@@ -42,21 +41,24 @@ serve(async (req) => {
         For each question, provide 4 options (A, B, C, D) with one correct answer. 
         Format each question as a JSON object with: id, questionText, options (array), 
         correctAnswer (the full text of the correct option), explanation, and if applicable: 
-        book, chapter, verse, category, topic, and difficultyLevel.`
+        book, chapter, verse, category (like "Old Testament History", "Gospel", etc.), 
+        topic (like "Creation", "Sermon on the Mount", etc.), and difficultyLevel.`
         break
       
       case "true-false":
         systemPrompt += `true/false questions about the following Bible content.
         Format each question as a JSON object with: id, questionText, options (array with just "True" and "False"),
         correctAnswer (either "True" or "False"), explanation, and if applicable:
-        book, chapter, verse, category, topic, and difficultyLevel.`
+        book, chapter, verse, category (like "Old Testament History", "Gospel", etc.), 
+        topic (like "Creation", "Sermon on the Mount", etc.), and difficultyLevel.`
         break
         
       case "fill-in-blanks":
         systemPrompt += `fill-in-the-blank questions about the following Bible content.
         Format each question as a JSON object with: id, questionText (with a blank indicated by _____),
         correctAnswer (the word or phrase that belongs in the blank), explanation, and if applicable:
-        book, chapter, verse, category, topic, and difficultyLevel.`
+        book, chapter, verse, category (like "Old Testament History", "Gospel", etc.), 
+        topic (like "Creation", "Sermon on the Mount", etc.), and difficultyLevel.`
         break
         
       default:

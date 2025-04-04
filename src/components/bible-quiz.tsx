@@ -254,8 +254,8 @@ export function BibleQuiz({ onComplete }: BibleQuizProps) {
     });
     
     // Extract categories, topics, and books from questions
-    const categories = [...new Set(currentQuestions.filter(q => q.category).map(q => q.category))];
-    const topics = [...new Set(currentQuestions.filter(q => q.topic).map(q => q.topic))];
+    const categories = [...new Set(currentQuestions.filter(q => q.category).map(q => q.category as string))];
+    const topics = [...new Set(currentQuestions.filter(q => q.topic).map(q => q.topic as string))];
     
     // Calculate time spent (actual time or estimated from question timers)
     const quizStartTime = new Date().getTime() - getQuizDuration() * 1000;
