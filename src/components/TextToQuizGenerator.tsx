@@ -1,12 +1,23 @@
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, PenTool, CheckSquare, List, Save, Loader2, Sparkles, FileCheck } from "lucide-react";
+import { 
+  FileText, 
+  PenTool, 
+  CheckSquare, 
+  List, 
+  Save, 
+  Loader2, 
+  Sparkles, 
+  FileCheck,
+  FileUp,
+  AlertCircle
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -15,8 +26,13 @@ import {
   QuizQuestion 
 } from "@/services/quiz-generator";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
+import * as pdfjs from 'pdfjs-dist';
+
+// Set the PDF.js worker source
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.js`;
 
 const QuizTypeOptions = [
   { value: "multiple-choice", label: "Multiple Choice", icon: CheckSquare },
@@ -33,14 +49,71 @@ export function TextToQuizGenerator() {
   const [isSaving, setIsSaving] = useState(false);
   const [previewQuiz, setPreviewQuiz] = useState<GeneratedQuiz | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  // Handle file upload
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Check file type
+    if (file.type !== 'application/pdf') {
+      toast({
+        variant: "destructive",
+        title: "Invalid file type",
+        description: "Please upload a PDF file"
+      });
+      return;
+    }
+
+    setUploadedFileName(file.name);
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    try {
+      // Read the file
+      const arrayBuffer = await file.arrayBuffer();
+      
+      // Load the PDF
+      const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+      let extractedText = '';
+
+      // Extract text from each page
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map((item: any) => item.str).join(' ');
+        extractedText += pageText + ' ';
+      }
+
+      // Set the extracted text to the content
+      setContent(extractedText.trim());
+      
+      toast({
+        title: "PDF uploaded successfully",
+        description: `Extracted text from "${file.name}"`
+      });
+    } catch (error) {
+      console.error("Error processing PDF:", error);
+      toast({
+        variant: "destructive",
+        title: "Error processing PDF",
+        description: "Failed to extract text from the PDF"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleCreateQuiz = async () => {
     if (!content.trim()) {
       toast({
         variant: "destructive",
         title: "Missing content",
-        description: "Please provide text content for your quiz"
+        description: "Please provide text content or upload a PDF for your quiz"
       });
       return;
     }
@@ -55,6 +128,7 @@ export function TextToQuizGenerator() {
     }
 
     setIsLoading(true);
+    setErrorMessage(null);
     
     try {
       // Check authentication
@@ -89,7 +163,25 @@ export function TextToQuizGenerator() {
         throw new Error(errorData.error || "Failed to generate quiz");
       }
 
-      const data = await response.json();
+      const responseText = await response.text();
+      if (!responseText || responseText.trim() === '') {
+        throw new Error("Received empty response from server");
+      }
+
+      // Safely parse the JSON
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (error) {
+        console.error("JSON parsing error:", error);
+        console.error("Response text:", responseText);
+        throw new Error("Failed to parse server response");
+      }
+
+      // Validate the response structure
+      if (!data || !Array.isArray(data.questions)) {
+        throw new Error("Invalid response format from server");
+      }
       
       const generatedQuiz: GeneratedQuiz = {
         id: crypto.randomUUID(),
@@ -107,6 +199,7 @@ export function TextToQuizGenerator() {
       });
     } catch (error) {
       console.error("Quiz generation error:", error);
+      setErrorMessage(error instanceof Error ? error.message : "There was a problem generating your quiz");
       toast({
         variant: "destructive",
         title: "Error generating quiz",
@@ -142,7 +235,6 @@ export function TextToQuizGenerator() {
         return;
       }
 
-      // Use generated_quizzes instead of ai_quizzes for TypeScript compatibility
       // Convert questions to Json type
       const jsonQuestions = JSON.parse(JSON.stringify(previewQuiz.questions)) as Json;
       
@@ -168,6 +260,7 @@ export function TextToQuizGenerator() {
       // Reset form after successful save
       setTitle("");
       setContent("");
+      setUploadedFileName(null);
       setPreviewQuiz(null);
       setShowPreview(false);
     } catch (error) {
@@ -234,10 +327,18 @@ export function TextToQuizGenerator() {
       <CardHeader>
         <CardTitle className="text-coral-light">Text to Quiz</CardTitle>
         <CardDescription>
-          Enter text content to create a custom quiz based on it using AI
+          Enter text content or upload a PDF file to create a custom quiz based on it using AI
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {errorMessage && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{errorMessage}</AlertDescription>
+          </Alert>
+        )}
+
         <div className="space-y-2">
           <Label htmlFor="title">Quiz Title</Label>
           <Input
@@ -250,10 +351,53 @@ export function TextToQuizGenerator() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="content">Text Content</Label>
+          <div className="flex justify-between items-center">
+            <Label htmlFor="content">Text Content</Label>
+            <div className="flex gap-2 items-center">
+              <input
+                type="file"
+                accept=".pdf"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLoading}
+                className="flex items-center gap-2 border-teal/20 hover:bg-teal/10"
+              >
+                <FileUp className="h-4 w-4" />
+                Upload PDF
+              </Button>
+            </div>
+          </div>
+          
+          {uploadedFileName && (
+            <div className="flex items-center gap-2 p-2 bg-muted/50 text-sm rounded mb-2">
+              <FileText className="h-4 w-4 text-coral" />
+              <span className="truncate max-w-[250px]">{uploadedFileName}</span>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-6 px-2 ml-auto" 
+                onClick={() => {
+                  setUploadedFileName(null);
+                  if (fileInputRef.current) fileInputRef.current.value = '';
+                }}
+              >
+                ×
+              </Button>
+            </div>
+          )}
+          
           <Textarea
             id="content"
-            placeholder="Paste or type the text content for your quiz..."
+            placeholder={uploadedFileName 
+              ? "PDF content extracted. You can edit or add more content if needed." 
+              : "Paste or type the text content for your quiz, or upload a PDF file..."}
             value={content}
             onChange={(e) => setContent(e.target.value)}
             className="min-h-[200px] border-teal/20 focus:border-teal/50 focus-visible:ring-teal/20"

@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1"
 import { v4 as uuidv4 } from "https://esm.sh/uuid@11.0.0"
@@ -40,25 +41,25 @@ serve(async (req) => {
         systemPrompt += `multiple-choice questions about the following Bible content. 
         For each question, provide 4 options (A, B, C, D) with one correct answer. 
         Format each question as a JSON object with: id, questionText, options (array), 
-        correctAnswer (the full text of the correct option), explanation, and if applicable: 
-        book, chapter, verse, category (like "Old Testament History", "Gospel", etc.), 
-        topic (like "Creation", "Sermon on the Mount", etc.), and difficultyLevel.`
+        correctAnswer (the full text of the correct option), explanation, book, chapter, verse, 
+        category (like "Old Testament History", "Gospel", etc.), and
+        topic (like "Creation", "Sermon on the Mount", etc.).`
         break
       
       case "true-false":
         systemPrompt += `true/false questions about the following Bible content.
         Format each question as a JSON object with: id, questionText, options (array with just "True" and "False"),
-        correctAnswer (either "True" or "False"), explanation, and if applicable:
-        book, chapter, verse, category (like "Old Testament History", "Gospel", etc.), 
-        topic (like "Creation", "Sermon on the Mount", etc.), and difficultyLevel.`
+        correctAnswer (either "True" or "False"), explanation, book, chapter, verse, 
+        category (like "Old Testament History", "Gospel", etc.), and
+        topic (like "Creation", "Sermon on the Mount", etc.).`
         break
         
       case "fill-in-blanks":
         systemPrompt += `fill-in-the-blank questions about the following Bible content.
         Format each question as a JSON object with: id, questionText (with a blank indicated by _____),
-        correctAnswer (the word or phrase that belongs in the blank), explanation, and if applicable:
-        book, chapter, verse, category (like "Old Testament History", "Gospel", etc.), 
-        topic (like "Creation", "Sermon on the Mount", etc.), and difficultyLevel.`
+        correctAnswer (the word or phrase that belongs in the blank), explanation, book, chapter, verse, 
+        category (like "Old Testament History", "Gospel", etc.), and
+        topic (like "Creation", "Sermon on the Mount", etc.).`
         break
         
       default:
@@ -66,7 +67,7 @@ serve(async (req) => {
         Format each question as a JSON object with appropriate fields.`
     }
 
-    systemPrompt += `\nReturn ONLY a valid JSON array containing the questions, with no additional text.`
+    systemPrompt += `\nReturn ONLY a valid JSON array containing the questions, with no additional text or formatting.`
 
     // Call OpenAI API to generate questions
     const openAIResponse = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -103,22 +104,81 @@ serve(async (req) => {
 
     const openAIData = await openAIResponse.json()
     
+    if (!openAIData || !openAIData.choices || !openAIData.choices[0] || !openAIData.choices[0].message) {
+      console.error("Invalid response from OpenAI:", openAIData)
+      return new Response(
+        JSON.stringify({ error: "Invalid response from OpenAI" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      )
+    }
+    
     // Extract the generated questions from the response
     let questions = []
     try {
       const contentText = openAIData.choices[0].message.content.trim()
+      
+      // Check if response is empty
+      if (!contentText) {
+        throw new Error("OpenAI returned an empty response")
+      }
+      
+      // Attempt to clean up the response if it's not valid JSON
+      let cleanedText = contentText
+      
+      // Remove any markdown code block indicators
+      if (cleanedText.startsWith("```json")) {
+        cleanedText = cleanedText.substring(7)
+      } else if (cleanedText.startsWith("```")) {
+        cleanedText = cleanedText.substring(3)
+      }
+      
+      if (cleanedText.endsWith("```")) {
+        cleanedText = cleanedText.substring(0, cleanedText.length - 3)
+      }
+      
+      // Trim again after cleanup
+      cleanedText = cleanedText.trim()
+      
       // Parse the JSON from the response
-      questions = JSON.parse(contentText)
+      questions = JSON.parse(cleanedText)
+      
+      // If the response is not an array, wrap it in an array
+      if (!Array.isArray(questions)) {
+        if (typeof questions === 'object') {
+          questions = [questions]
+        } else {
+          throw new Error("Response is not a valid JSON array or object")
+        }
+      }
       
       // Add UUIDs to questions if they don't have them
       questions = questions.map(q => ({
         ...q,
-        id: q.id || uuidv4()
+        id: q.id || uuidv4(),
+        // Ensure these fields exist, even if empty
+        category: q.category || "",
+        topic: q.topic || "",
+        book: q.book || "",
+        chapter: q.chapter || null,
+        verse: q.verse || null,
       }))
+      
+      // Validate that all required fields are present
+      questions.forEach(q => {
+        if (!q.questionText || !q.correctAnswer) {
+          throw new Error("Question missing required fields")
+        }
+      })
     } catch (error) {
       console.error("Error parsing OpenAI response:", error)
+      console.error("Raw response:", openAIData.choices[0].message.content)
+      
       return new Response(
-        JSON.stringify({ error: "Failed to parse generated questions", details: error.message }),
+        JSON.stringify({ 
+          error: "Failed to parse generated questions", 
+          details: error.message,
+          rawResponse: openAIData.choices[0].message.content.substring(0, 500) // Include part of the raw response for debugging
+        }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       )
     }

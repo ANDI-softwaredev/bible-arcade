@@ -1,13 +1,25 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronLeft, ChevronRight, BookOpen, Save, CheckCircle } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
+import { 
+  ChevronLeft, 
+  ChevronRight, 
+  BookOpen, 
+  Save, 
+  CheckCircle, 
+  FileText,
+  AlertTriangle
+} from "lucide-react";
 import { getChapter, rsvBibleSample, BibleVerse } from "@/data/bible-rsv";
-import { saveReadingProgress } from "@/services/bible-api";
+import { saveReadingProgress, getAllReadingProgress } from "@/services/bible-api";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface BibleReaderProps {
   initialBook?: string;
@@ -27,8 +39,14 @@ export function BibleReader({
   const [chapterVerses, setChapterVerses] = useState<BibleVerse[]>([]);
   const [maxChapters, setMaxChapters] = useState(1);
   const [isChapterRead, setIsChapterRead] = useState(false);
+  const [journalEntry, setJournalEntry] = useState('');
+  const [isSavingJournal, setIsSavingJournal] = useState(false);
+  const [loadingError, setLoadingError] = useState<string | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
+  
+  // Determine available books from the RSV Bible data
+  const availableBooks = Object.keys(rsvBibleSample);
   
   // Notify parent component about loading state
   useEffect(() => {
@@ -42,55 +60,102 @@ export function BibleReader({
     };
   }, [onLoading]);
   
-  // Determine available books from the RSV Bible data
-  const availableBooks = Object.keys(rsvBibleSample);
+  // Get the journal entry for the current chapter
+  const fetchJournalEntry = async () => {
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.user) return;
+      
+      const { data, error } = await supabase
+        .from('journal_entries')
+        .select('text')
+        .eq('user_id', session.session.user.id)
+        .eq('book', selectedBook)
+        .eq('chapter', selectedChapter)
+        .maybeSingle();
+      
+      if (error) throw error;
+      
+      if (data) {
+        setJournalEntry(data.text);
+      } else {
+        setJournalEntry('');
+      }
+    } catch (error) {
+      console.error("Error fetching journal entry:", error);
+    }
+  };
   
   useEffect(() => {
     // Notify parent component about loading state
     if (onLoading) onLoading(true);
     
-    // Load chapter content
-    const chapter = getChapter(selectedBook, selectedChapter);
+    setLoadingError(null);
     
-    if (chapter) {
-      setChapterVerses(chapter.verses);
+    try {
+      // Load chapter content
+      const chapter = getChapter(selectedBook, selectedChapter);
       
-      // Check if this chapter has been read by the current user
-      const checkIfRead = async () => {
-        try {
-          // Get reading progress from the API
-          const allProgress = await getAllReadingProgress();
-          const isRead = allProgress.some(
-            p => p.book === selectedBook && p.chapter === selectedChapter && p.completed
-          );
-          setIsChapterRead(isRead);
-          
-          // Loading complete
-          if (onLoading) onLoading(false);
-        } catch (error) {
-          console.error("Error checking read status:", error);
-          setIsChapterRead(false);
-          
-          // Loading complete even on error
-          if (onLoading) onLoading(false);
-        }
-      };
+      if (chapter) {
+        setChapterVerses(chapter.verses);
+        
+        // Check if this chapter has been read by the current user
+        const checkIfRead = async () => {
+          try {
+            const { data: session } = await supabase.auth.getSession();
+            if (!session?.session?.user) {
+              if (onLoading) onLoading(false);
+              return;
+            }
+            
+            const { data, error } = await supabase
+              .from('reading_progress')
+              .select('*')
+              .eq('user_id', session.session.user.id)
+              .eq('book', selectedBook)
+              .eq('chapter', selectedChapter)
+              .eq('completed', true)
+              .maybeSingle();
+            
+            if (error) throw error;
+            
+            setIsChapterRead(!!data);
+            
+            // Fetch journal entry
+            await fetchJournalEntry();
+            
+            // Loading complete
+            if (onLoading) onLoading(false);
+          } catch (error) {
+            console.error("Error checking read status:", error);
+            setIsChapterRead(false);
+            
+            // Loading complete even on error
+            if (onLoading) onLoading(false);
+          }
+        };
+        
+        checkIfRead();
+      } else {
+        setChapterVerses([]);
+        setLoadingError("Chapter not found in the available data.");
+        
+        // Loading complete when no chapter is found
+        if (onLoading) onLoading(false);
+      }
       
-      checkIfRead();
-    } else {
-      setChapterVerses([]);
+      // Update max chapters for the selected book
+      const bookChapters = rsvBibleSample[selectedBook] || {};
+      setMaxChapters(Object.keys(bookChapters).length || 1);
       
-      // Loading complete when no chapter is found
+      // Notify parent about progress update
+      if (onProgressUpdate) {
+        onProgressUpdate(selectedBook, selectedChapter);
+      }
+    } catch (error) {
+      console.error("Error loading Bible chapter:", error);
+      setLoadingError("Error loading Bible data. Please try again.");
       if (onLoading) onLoading(false);
-    }
-    
-    // Update max chapters for the selected book
-    const bookChapters = rsvBibleSample[selectedBook] || {};
-    setMaxChapters(Object.keys(bookChapters).length);
-    
-    // Notify parent about progress update
-    if (onProgressUpdate) {
-      onProgressUpdate(selectedBook, selectedChapter);
     }
   }, [selectedBook, selectedChapter, onLoading, onProgressUpdate]);
   
@@ -129,7 +194,28 @@ export function BibleReader({
   
   const markAsRead = async () => {
     try {
-      await saveReadingProgress(selectedBook, selectedChapter);
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.user) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in to save your progress",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      const { error } = await supabase
+        .from('reading_progress')
+        .upsert({
+          user_id: session.session.user.id,
+          book: selectedBook,
+          chapter: selectedChapter,
+          completed: true,
+          last_read: new Date().toISOString()
+        });
+      
+      if (error) throw error;
+      
       setIsChapterRead(true);
       toast({
         title: "Progress Saved",
@@ -150,17 +236,78 @@ export function BibleReader({
     }
   };
   
-  // Imported functions from bible-api.ts (simplified here for direct access)
-  const getAllReadingProgress = async () => {
+  const saveJournal = async () => {
+    if (!journalEntry.trim()) {
+      toast({
+        title: "Empty Journal",
+        description: "Please write something before saving.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     try {
-      // This is a simplified version - in reality, it would call the API function
-      const progressStr = localStorage.getItem("bible-reading-progress");
-      return progressStr ? JSON.parse(progressStr) : [];
+      setIsSavingJournal(true);
+      
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.user) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in to save your journal",
+          variant: "destructive"
+        });
+        setIsSavingJournal(false);
+        return;
+      }
+      
+      const { error } = await supabase
+        .from('journal_entries')
+        .upsert({
+          user_id: session.session.user.id,
+          book: selectedBook,
+          chapter: selectedChapter,
+          text: journalEntry,
+          last_updated: new Date().toISOString()
+        });
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Journal Saved",
+        description: "Your journal entry has been saved."
+      });
     } catch (error) {
-      console.error("Error getting reading progress:", error);
-      return [];
+      console.error("Error saving journal:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save journal entry.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSavingJournal(false);
     }
   };
+  
+  if (loadingError) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-xl">
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+            Error Loading Bible Data
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="p-6 text-center">
+            <p className="text-destructive mb-4">{loadingError}</p>
+            <Button onClick={() => window.location.reload()}>
+              Retry
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
   
   return (
     <Card className="w-full">
@@ -212,18 +359,59 @@ export function BibleReader({
       
       <CardContent>
         <div className="space-y-6">
-          <div className="text-xl font-semibold">
-            {selectedBook} {selectedChapter}
+          <div className="flex items-center gap-3">
+            <Checkbox 
+              id="chapter-read" 
+              checked={isChapterRead} 
+              onCheckedChange={() => {
+                if (!isChapterRead) {
+                  markAsRead();
+                }
+              }}
+            />
+            <label htmlFor="chapter-read" className="text-xl font-semibold cursor-pointer">
+              {selectedBook} {selectedChapter}
+            </label>
           </div>
           
           <div className="space-y-4">
             {chapterVerses.length > 0 ? (
-              chapterVerses.map((verse) => (
-                <div key={verse.verse} className="group">
-                  <span className="text-sm font-semibold text-primary mr-2">{verse.verse}</span>
-                  <span>{verse.text}</span>
+              <div>
+                <div className="border p-4 rounded-md bg-card/80 max-h-[300px] overflow-y-auto mb-4">
+                  {chapterVerses.map((verse) => (
+                    <div key={verse.verse} className="group mb-2">
+                      <span className="text-sm font-semibold text-primary mr-2">{verse.verse}</span>
+                      <span>{verse.text}</span>
+                    </div>
+                  ))}
                 </div>
-              ))
+                
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex items-center mb-2">
+                      <FileText className="h-4 w-4 mr-2 text-primary" />
+                      <h3 className="font-medium">Journal Notes</h3>
+                    </div>
+                    <Textarea
+                      placeholder="Write your thoughts and insights about this chapter..."
+                      className="min-h-[150px]"
+                      value={journalEntry}
+                      onChange={(e) => setJournalEntry(e.target.value)}
+                    />
+                  </div>
+                  
+                  <div className="flex justify-end">
+                    <Button 
+                      onClick={saveJournal}
+                      disabled={isSavingJournal}
+                      className="bg-teal hover:bg-teal-dark"
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      {isSavingJournal ? 'Saving...' : 'Save Notes'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 No verses available for this chapter.
@@ -259,7 +447,7 @@ export function BibleReader({
               disabled={isChapterRead}
               className="flex items-center gap-1"
             >
-              <Save className="h-4 w-4" />
+              <CheckCircle className="h-4 w-4" />
               {isChapterRead ? "Already Read" : "Mark as Read"}
             </Button>
           </div>
