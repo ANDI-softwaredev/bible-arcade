@@ -96,6 +96,8 @@ export const generateAIQuiz = async (params: {
   difficultyDistribution?: boolean; // Option to distribute questions by difficulty
 }): Promise<GeneratedQuiz> => {
   try {
+    console.log("Sending request to generate-quiz with params:", JSON.stringify(params));
+    
     const response = await fetch("/api/generate-quiz", {
       method: "POST",
       headers: {
@@ -105,10 +107,35 @@ export const generateAIQuiz = async (params: {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to generate quiz: ${response.statusText}`);
+      const errorText = await response.text();
+      console.error("Error response from generate-quiz:", errorText);
+      throw new Error(`Failed to generate quiz: ${response.statusText}. Details: ${errorText}`);
     }
 
-    const quiz = await response.json();
+    const responseText = await response.text();
+    console.log("Raw response from generate-quiz:", responseText);
+    
+    if (!responseText) {
+      throw new Error("Empty response from quiz generation API");
+    }
+    
+    let quizData;
+    try {
+      quizData = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("JSON parse error:", parseError);
+      console.error("Failed to parse response:", responseText);
+      throw new Error(`Failed to parse response: ${parseError.message}`);
+    }
+    
+    if (!quizData || !quizData.questions) {
+      console.error("Invalid quiz data structure:", quizData);
+      throw new Error("Quiz generation returned invalid data structure");
+    }
+    
+    const quiz = {
+      questions: quizData.questions
+    };
     
     if (params.timed && quiz.questions) {
       quiz.questions = quiz.questions.map((question: QuizQuestion) => {

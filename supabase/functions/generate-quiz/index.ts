@@ -149,6 +149,9 @@ serve(async (req) => {
         }
       }
       
+      // Further cleanup: ensure we have valid JSON by escaping quotes in strings
+      cleanedText = cleanedText.replace(/\\(?!["\\/bfnrt])/g, "\\\\")
+      
       // Trim again after cleanup
       cleanedText = cleanedText.trim()
       

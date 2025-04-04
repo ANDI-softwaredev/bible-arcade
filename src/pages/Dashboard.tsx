@@ -15,6 +15,7 @@ import {
   getAllReadingProgress,
   getCompletedBooks
 } from "@/services/bible-api";
+import { getQuizResults } from "@/services/quiz-generator";
 
 const Dashboard = () => {
   const { user, profile } = useAuth();
@@ -23,6 +24,7 @@ const Dashboard = () => {
   const [studyStreak, setStudyStreak] = useState(0);
   const [weeklyReading, setWeeklyReading] = useState(0);
   const [completedStudies, setCompletedStudies] = useState(0);
+  const [quizzesTaken, setQuizzesTaken] = useState(0);
   const [bibleProgress, setBibleProgress] = useState({
     overall: 0,
     oldTestament: 0,
@@ -42,6 +44,10 @@ const Dashboard = () => {
         const completedBooks = await getCompletedBooks();
         const chaptersRead = allProgress.length;
         
+        // Get quiz results
+        const quizResults = await getQuizResults();
+        const numQuizzesTaken = quizResults.length;
+        
         setBibleProgress({
           overall,
           oldTestament,
@@ -50,6 +56,7 @@ const Dashboard = () => {
         });
         
         setCompletedStudies(completedBooks.length);
+        setQuizzesTaken(numQuizzesTaken);
         
         // Calculate study streak
         const streak = calculateStudyStreak(allProgress);
@@ -223,9 +230,10 @@ const Dashboard = () => {
             trend={weeklyReading > 0 ? { value: Math.round(weeklyReading * 10), positive: true } : undefined}
           />
           <StatCard 
-            title="Completed Studies" 
-            value={completedStudies.toString()} 
+            title="Quizzes Taken" 
+            value={quizzesTaken.toString()} 
             icon={<BookMarked className="h-4 w-4 text-primary" />}
+            trend={quizzesTaken > 0 ? { value: quizzesTaken, positive: true } : undefined}
           />
           <StatCard 
             title="Chapters Read" 
