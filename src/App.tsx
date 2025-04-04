@@ -22,9 +22,6 @@ import CustomQuiz from "./pages/CustomQuiz";
 import MobileAR from "./pages/MobileAR";
 import NotFound from "./pages/NotFound";
 
-// Create a new query client
-const queryClient = new QueryClient();
-
 // Auth guard component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -125,7 +122,11 @@ const AppRoutes = () => {
   );
 };
 
+// Move this inside the component to fix the React hooks issue
 const App = () => {
+  // Create a new query client inside the component
+  const [queryClient] = useState(() => new QueryClient());
+  
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
