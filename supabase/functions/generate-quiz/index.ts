@@ -67,7 +67,7 @@ serve(async (req) => {
         Format each question as a JSON object with appropriate fields.`
     }
 
-    systemPrompt += `\nReturn ONLY a valid JSON array containing the questions, with no additional text or formatting.`
+    systemPrompt += `\nReturn ONLY a valid JSON array containing the questions, with no additional text or formatting. Make sure your response starts with '[' and ends with ']'. Do not include any explanation or code block markers.`
 
     // Call OpenAI API to generate questions
     const openAIResponse = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -89,7 +89,7 @@ serve(async (req) => {
           }
         ],
         temperature: 0.7,
-        max_tokens: 2000,
+        max_tokens: 3000,
       }),
     })
 
@@ -136,8 +136,23 @@ serve(async (req) => {
         cleanedText = cleanedText.substring(0, cleanedText.length - 3)
       }
       
+      // Ensure the content is a valid JSON array
+      if (!cleanedText.startsWith("[") && !cleanedText.endsWith("]")) {
+        if (cleanedText.includes("[") && cleanedText.includes("]")) {
+          // Extract the array portion if it exists somewhere in the text
+          const startIdx = cleanedText.indexOf("[")
+          const endIdx = cleanedText.lastIndexOf("]") + 1
+          cleanedText = cleanedText.substring(startIdx, endIdx)
+        } else {
+          // Try to wrap the content in array brackets
+          cleanedText = `[${cleanedText}]`
+        }
+      }
+      
       // Trim again after cleanup
       cleanedText = cleanedText.trim()
+      
+      console.log("Attempting to parse JSON:", cleanedText.substring(0, 100) + "...")
       
       // Parse the JSON from the response
       questions = JSON.parse(cleanedText)
