@@ -1,6 +1,5 @@
-
 import { useState, useEffect } from "react";
-import { Search, BookOpen, Filter } from "lucide-react";
+import { Search, BookOpen, Filter, CheckSquare } from "lucide-react";
 import { motion } from "framer-motion";
 import { Layout } from "@/components/layout";
 import { Input } from "@/components/ui/input";
@@ -11,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { VerseLoading } from "@/components/ui/verse-loading";
 import { saveStudyDuration } from "@/services/quiz-generator";
+import { supabase } from "@/integrations/supabase/client";
 
 const studyModules = [
   {
@@ -89,28 +89,47 @@ const Study = () => {
   const [activeTab, setActiveTab] = useState("studies");
   const [loading, setLoading] = useState(false);
   const { profile } = useAuth();
+  const [completedChapters, setCompletedChapters] = useState<{book: string, chapter: number}[]>([]);
   
   const filteredModules = studyModules.filter((module) => {
-    // Filter by search query
     const matchesSearch = 
       module.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       module.description.toLowerCase().includes(searchQuery.toLowerCase());
     
-    // Filter by category
     const matchesCategory = 
       activeCategory === "all" || module.category === activeCategory;
     
     return matchesSearch && matchesCategory;
   });
 
-  // Handle study session start
+  useEffect(() => {
+    const fetchCompletedChapters = async () => {
+      try {
+        const { data: session } = await supabase.auth.getSession();
+        if (!session?.session?.user) return;
+
+        const { data, error } = await supabase
+          .from('reading_progress')
+          .select('book, chapter')
+          .eq('user_id', session.session.user.id)
+          .eq('completed', true);
+
+        if (error) throw error;
+        setCompletedChapters(data || []);
+      } catch (error) {
+        console.error("Error fetching completed chapters:", error);
+      }
+    };
+
+    fetchCompletedChapters();
+  }, []);
+
   useEffect(() => {
     const startTime = new Date();
     let currentBook: string | undefined;
     let currentChapter: number | undefined;
     
     return () => {
-      // When component unmounts, calculate duration and save
       const endTime = new Date();
       const duration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60)); // in minutes
       
@@ -125,15 +144,18 @@ const Study = () => {
     };
   }, []);
 
-  // Handle progress update
   const handleProgressUpdate = (book?: string, chapter?: number) => {
-    // Save book and chapter information for study duration tracking
     if (book && chapter) {
-      // In a real app, this would update the current reading position
       console.log("Reading progress updated:", book, chapter);
     }
   };
-  
+
+  const isChapterCompleted = (book: string, chapter: number): boolean => {
+    return completedChapters.some(item => 
+      item.book === book && item.chapter === chapter
+    );
+  };
+
   return (
     <Layout>
       <div className="pt-8 sm:pt-12">
@@ -141,14 +163,14 @@ const Study = () => {
           <div className="pill mb-3 inline-block">Bible Study</div>
           <h1 className="text-3xl font-bold">Explore Biblical Teachings</h1>
           <p className="text-muted-foreground mt-2">
-            Dive into our comprehensive Bible study modules or read directly from the Bible
+            Dive into our comprehensive Bible study modules or mark your reading progress with checkboxes
           </p>
         </header>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full mb-8">
           <TabsList className="w-full grid grid-cols-2 bg-card/60 backdrop-blur-sm">
             <TabsTrigger value="studies" className="data-[state=active]:bg-coral/80 data-[state=active]:text-white">Study Modules</TabsTrigger>
-            <TabsTrigger value="read" className="data-[state=active]:bg-teal/80 data-[state=active]:text-white">Read the Bible</TabsTrigger>
+            <TabsTrigger value="read" className="data-[state=active]:bg-teal/80 data-[state=active]:text-white">Bible Reading</TabsTrigger>
           </TabsList>
           
           <TabsContent value="studies">
@@ -222,6 +244,21 @@ const Study = () => {
           </TabsContent>
           
           <TabsContent value="read">
+            <div className="mb-6">
+              <div className="glass-card rounded-xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold flex items-center">
+                    <CheckSquare className="h-5 w-5 mr-2 text-coral" />
+                    Your Reading Progress
+                  </h2>
+                  <div className="pill">{completedChapters.length} chapters completed</div>
+                </div>
+                <p className="text-muted-foreground mb-4">
+                  Track your Bible reading progress by checking off chapters as you complete them. Your progress will be shown on your dashboard.
+                </p>
+              </div>
+            </div>
+            
             {loading ? (
               <div className="py-12">
                 <VerseLoading message="Loading the Bible..." />

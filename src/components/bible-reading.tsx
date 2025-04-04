@@ -1,6 +1,5 @@
-
 import { useState, useEffect } from "react";
-import { ChevronDown, Book, ChevronRight, Edit } from "lucide-react";
+import { ChevronDown, Book, ChevronRight, Edit, BookCheck, CheckSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { 
@@ -17,7 +16,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { BibleReader } from "@/components/BibleReader";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { 
   getBibleBooks, 
@@ -43,6 +43,7 @@ export function BibleReading({ onReadComplete }: BibleReadingProps) {
   const [expandedBooks, setExpandedBooks] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<"read" | "journal">("read");
   const [isReadingCompleted, setIsReadingCompleted] = useState(false);
+  const [keyPoints, setKeyPoints] = useState("");
   const { toast } = useToast();
   
   const toggleBookExpansion = (bookId: string) => {
@@ -84,20 +85,20 @@ export function BibleReading({ onReadComplete }: BibleReadingProps) {
       
       try {
         setLoading(true);
-        const chapter = await getBibleChapter(undefined, selectedBook.id, selectedChapter);
-        setChapterContent(chapter.content);
-        
         // Check if this reading has been completed
-        checkReadingComplete();
+        await checkReadingComplete();
+        
+        // Load key points if available
+        await loadKeyPoints();
+        
+        setLoading(false);
       } catch (error) {
-        console.error("Error loading Bible chapter:", error);
+        console.error("Error loading Bible chapter info:", error);
         toast({
-          title: "Error loading chapter",
-          description: `Could not load ${selectedBook.name} chapter ${selectedChapter}.`,
+          title: "Error loading chapter information",
+          description: `Could not load data for ${selectedBook.name} chapter ${selectedChapter}.`,
           variant: "destructive",
         });
-        setChapterContent("");
-      } finally {
         setLoading(false);
       }
     };
@@ -130,11 +131,76 @@ export function BibleReading({ onReadComplete }: BibleReadingProps) {
     }
   };
   
+  const loadKeyPoints = async () => {
+    if (!selectedBook) return;
+    
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.user) {
+        setKeyPoints("");
+        return;
+      }
+      
+      const { data } = await supabase
+        .from('journal_entries')
+        .select('text')
+        .eq('book', selectedBook.name)
+        .eq('chapter', selectedChapter)
+        .eq('user_id', session.session.user.id)
+        .maybeSingle();
+      
+      setKeyPoints(data?.text || "");
+    } catch (error) {
+      console.error("Error loading key points:", error);
+      setKeyPoints("");
+    }
+  };
+  
   const handleChapterSelect = (chapterNum: number) => {
     setSelectedChapter(chapterNum);
   };
   
-  const handleMarkComplete = async () => {
+  const saveKeyPoints = async () => {
+    if (!selectedBook) return;
+    
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.user) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in to save your key points",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Save to database
+      const { error } = await supabase
+        .from('journal_entries')
+        .upsert({
+          book: selectedBook.name,
+          chapter: selectedChapter,
+          text: keyPoints,
+          user_id: session.session.user.id
+        }, { onConflict: 'user_id, book, chapter' });
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Key points saved",
+        description: `Your notes for ${selectedBook.name} chapter ${selectedChapter} have been saved.`,
+      });
+    } catch (error) {
+      console.error("Error saving key points:", error);
+      toast({
+        title: "Error saving key points",
+        description: "Could not save your notes.",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  const handleMarkComplete = async (isCompleted: boolean) => {
     if (selectedBook) {
       try {
         const { data: session } = await supabase.auth.getSession();
@@ -151,25 +217,25 @@ export function BibleReading({ onReadComplete }: BibleReadingProps) {
         saveReadingProgress(selectedBook.name, selectedChapter);
         
         // Save to database
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from('reading_progress')
           .upsert({
             book: selectedBook.name,
             chapter: selectedChapter,
-            completed: true,
+            completed: isCompleted,
             user_id: session.session.user.id
           }, { onConflict: 'user_id, book, chapter' });
         
         if (error) throw error;
         
-        setIsReadingCompleted(true);
+        setIsReadingCompleted(isCompleted);
         
         toast({
-          title: "Reading marked as complete",
-          description: `You've completed ${selectedBook.name} chapter ${selectedChapter}.`,
+          title: isCompleted ? "Reading marked as complete" : "Reading marked as incomplete",
+          description: `You've ${isCompleted ? 'completed' : 'unmarked'} ${selectedBook.name} chapter ${selectedChapter}.`,
         });
         
-        if (onReadComplete) {
+        if (onReadComplete && isCompleted) {
           onReadComplete(selectedBook.name, selectedChapter);
         }
       } catch (error) {
@@ -322,14 +388,20 @@ export function BibleReading({ onReadComplete }: BibleReadingProps) {
                 <h2 className="text-xl font-bold">
                   {selectedBook?.name} {selectedChapter}
                 </h2>
-                <div className="flex gap-2">
-                  <Button 
-                    onClick={handleMarkComplete} 
-                    disabled={isReadingCompleted}
-                    className={isReadingCompleted ? "bg-green-600 hover:bg-green-700" : ""}
-                  >
-                    {isReadingCompleted ? "Completed ✓" : "Mark as Read"}
-                  </Button>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="readingComplete" 
+                      checked={isReadingCompleted}
+                      onCheckedChange={(checked) => handleMarkComplete(checked === true)}
+                    />
+                    <label
+                      htmlFor="readingComplete"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      Mark as read
+                    </label>
+                  </div>
                   <Button 
                     variant="outline" 
                     onClick={() => setActiveTab(activeTab === "read" ? "journal" : "read")}
@@ -362,21 +434,35 @@ export function BibleReading({ onReadComplete }: BibleReadingProps) {
                 </TabsList>
                 
                 <TabsContent value="read" className="mt-0">
-                  <div className="bible-reader-container prose dark:prose-invert max-w-none">
-                    <BibleReader 
-                      initialBook={selectedBook?.name}
-                      initialChapter={selectedChapter}
-                    />
+                  <div className="flex flex-col space-y-4">
+                    <p className="text-muted-foreground text-sm">
+                      Use the checkbox above to mark this chapter as read when you've completed it.
+                    </p>
+                    <div className="p-4 border border-border rounded-md bg-card/40">
+                      <p className="text-center font-medium">
+                        📖 Read {selectedBook?.name} Chapter {selectedChapter} in your Bible
+                      </p>
+                    </div>
                   </div>
                 </TabsContent>
                 
                 <TabsContent value="journal" className="mt-0">
-                  {selectedBook && (
-                    <BibleJournal 
-                      book={selectedBook.name} 
-                      chapter={selectedChapter} 
-                    />
-                  )}
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">
+                        Key Points & Notes for {selectedBook?.name} {selectedChapter}
+                      </label>
+                      <Textarea
+                        placeholder="Enter key points and notes from your reading..."
+                        className="min-h-[200px]"
+                        value={keyPoints}
+                        onChange={(e) => setKeyPoints(e.target.value)}
+                      />
+                    </div>
+                    <Button onClick={saveKeyPoints}>
+                      Save Notes
+                    </Button>
+                  </div>
                 </TabsContent>
               </Tabs>
               

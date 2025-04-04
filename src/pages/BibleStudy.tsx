@@ -6,7 +6,7 @@ import { BibleQuiz } from "@/components/bible-quiz";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { BookOpen, BookText, Edit, BookCheck } from "lucide-react";
+import { BookOpen, BookText, Edit, BookCheck, CheckSquare } from "lucide-react";
 import { getCurrentWeekProgress, loadQuizAttempts, updateReadingProgress } from "@/data/bible-database";
 import { saveReadingProgress } from "@/services/bible-api";
 import { supabase } from "@/integrations/supabase/client";
@@ -113,7 +113,7 @@ const BibleStudy = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               <div className="bg-card/40 p-4 rounded-lg flex items-center space-x-4">
                 <div className="h-12 w-12 rounded-full bg-coral/20 flex items-center justify-center">
-                  <BookCheck className="h-6 w-6 text-coral" />
+                  <CheckSquare className="h-6 w-6 text-coral" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Chapters Read</p>
