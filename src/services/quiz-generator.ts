@@ -2,6 +2,31 @@
 import { supabase } from "@/integrations/supabase/client";
 import { trackReadingActivity } from "./bible-api";
 
+// Types for quiz functionality
+export interface QuizQuestion {
+  id: string;
+  questionText: string;
+  options?: string[];
+  correctAnswer: string;
+  book: string;
+  chapter: number;
+  verse?: number;
+  explanation?: string;
+  type?: string;
+  category?: string;
+  topic?: string;
+  difficulty?: string;
+  points?: number;
+  timeLimit?: number;
+}
+
+export interface GeneratedQuiz {
+  id: string;
+  title: string;
+  timestamp: string;
+  questions: QuizQuestion[];
+}
+
 // Function to generate a quiz based on a book and number of questions
 export async function generateQuiz(book: string, numQuestions: number) {
   try {
@@ -86,32 +111,70 @@ function generateFakeAnswer(verses: any[], correctAnswer: string) {
   return fakeAnswer;
 }
 
-// Function to save quiz results to Supabase
-export async function saveQuizResult(
-  userId: string,
-  quizId: string | null,
-  score: number,
-  totalQuestions: number,
-  correctAnswers: number,
-  timeSpent: number | null = 0,
-  timeBonus: number | null = 0,
-  questions: any[] | null = null,
-  performance_metrics: any | null = null
-): Promise<boolean> {
+// Function to save generated quiz to local storage and database
+export async function saveGeneratedQuiz(quiz: GeneratedQuiz): Promise<boolean> {
   try {
+    // Store in local storage
+    let savedQuizzes = getSavedGeneratedQuizzes();
+    savedQuizzes.push(quiz);
+    localStorage.setItem('generatedQuizzes', JSON.stringify(savedQuizzes));
+    return true;
+  } catch (error) {
+    console.error("Error saving generated quiz:", error);
+    return false;
+  }
+}
+
+// Function to get saved generated quizzes from local storage
+export function getSavedGeneratedQuizzes(): GeneratedQuiz[] {
+  try {
+    const savedQuizzesStr = localStorage.getItem('generatedQuizzes');
+    if (!savedQuizzesStr) return [];
+    
+    const savedQuizzes = JSON.parse(savedQuizzesStr);
+    return Array.isArray(savedQuizzes) ? savedQuizzes : [];
+  } catch (error) {
+    console.error("Error getting saved generated quizzes:", error);
+    return [];
+  }
+}
+
+// Function to save quiz results to Supabase
+export async function saveQuizResult(quizData: {
+  quizId?: string | null;
+  score: number;
+  totalQuestions: number;
+  correctAnswers: number;
+  timeSpent?: number | null;
+  timeBonus?: number | null;
+  questions?: any[] | null;
+  categories?: string[] | null;
+  topics?: string[] | null;
+  completedAt?: string;
+  userId?: string;
+}): Promise<boolean> {
+  try {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session?.session?.user) return false;
+
+    const userId = quizData.userId || session.session.user.id;
+
     const { error } = await supabase
       .from('quiz_results')
       .insert({
         user_id: userId,
-        quiz_id: quizId,
-        score: score,
-        total_questions: totalQuestions,
-        correct_answers: correctAnswers,
-        time_spent: timeSpent,
-        time_bonus: timeBonus,
-        completed_at: new Date().toISOString(),
-        questions: questions,
-        performance_metrics: performance_metrics
+        quiz_id: quizData.quizId || null,
+        score: quizData.score,
+        total_questions: quizData.totalQuestions,
+        correct_answers: quizData.correctAnswers,
+        time_spent: quizData.timeSpent || 0,
+        time_bonus: quizData.timeBonus || 0,
+        completed_at: quizData.completedAt || new Date().toISOString(),
+        questions: quizData.questions || null,
+        performance_metrics: {
+          categories: quizData.categories || [],
+          topics: quizData.topics || []
+        }
       });
 
     if (error) {
