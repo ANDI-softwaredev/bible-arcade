@@ -282,18 +282,20 @@ async function checkAndUpdateQuizBadges(userId: string): Promise<void> {
     const highestBadge = earnedBadges.reduce((prev, current) => 
       (prev.threshold > current.threshold) ? prev : current, earnedBadges[0]);
     
-    // Update or insert the badge record
-    // We need to manually insert or update because TypeScript doesn't recognize the user_badges table yet
-    const { error: badgeError } = await supabase.rpc(
-      'upsert_user_badge',
-      {
-        p_user_id: userId,
-        p_badge_id: highestBadge.id,
-        p_badge_title: highestBadge.title,
-        p_badge_description: highestBadge.description,
-        p_badge_icon: highestBadge.icon
+    // Use the edge function to upsert the badge instead of RPC directly
+    // This fixes the TypeScript error with parameters
+    const { data, error: badgeError } = await supabase.functions.invoke('database-helpers', {
+      body: {
+        name: 'upsert_user_badge',
+        params: {
+          p_user_id: userId,
+          p_badge_id: highestBadge.id,
+          p_badge_title: highestBadge.title,
+          p_badge_description: highestBadge.description,
+          p_badge_icon: highestBadge.icon
+        }
       }
-    );
+    });
       
     if (badgeError) {
       console.error("Error updating badges:", badgeError);
@@ -327,15 +329,20 @@ export async function getQuizResults() {
   }
 }
 
-// Update getUserBadges to use the correct table
+// Update getUserBadges to use the edge function instead of RPC directly
 export async function getUserBadges() {
   try {
     const { data: session } = await supabase.auth.getSession();
     if (!session?.session?.user) return [];
 
-    // Use a custom RPC function to get user badges
-    const { data, error } = await supabase.rpc('get_user_badges', {
-      p_user_id: session.session.user.id
+    // Use the edge function to get user badges instead of RPC directly
+    const { data, error } = await supabase.functions.invoke('database-helpers', {
+      body: {
+        name: 'get_user_badges',
+        params: {
+          p_user_id: session.session.user.id
+        }
+      }
     });
 
     if (error) {
@@ -343,26 +350,31 @@ export async function getUserBadges() {
       return [];
     }
 
-    return data || [];
+    return data?.data || [];
   } catch (error) {
     console.error("Error getting user badges:", error);
     return [];
   }
 }
 
-// Update saveStudyGoal to handle goal creation
+// Update saveStudyGoal to use the edge function instead of RPC directly
 export async function saveStudyGoal(goal: Omit<StudyGoal, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<boolean> {
   try {
     const { data: session } = await supabase.auth.getSession();
     if (!session?.session?.user) return false;
 
-    // Use RPC to insert goal
-    const { error } = await supabase.rpc('create_study_goal', {
-      p_user_id: session.session.user.id,
-      p_goal_type: goal.type,
-      p_target_value: String(goal.target),
-      p_progress: goal.progress,
-      p_completed: goal.completed
+    // Use the edge function to create the study goal
+    const { error } = await supabase.functions.invoke('database-helpers', {
+      body: {
+        name: 'create_study_goal',
+        params: {
+          p_user_id: session.session.user.id,
+          p_goal_type: goal.type,
+          p_target_value: String(goal.target),
+          p_progress: goal.progress,
+          p_completed: goal.completed
+        }
+      }
     });
 
     if (error) {
@@ -377,15 +389,20 @@ export async function saveStudyGoal(goal: Omit<StudyGoal, 'id' | 'userId' | 'cre
   }
 }
 
-// Update getStudyGoals to use the correct table and mapping
+// Update getStudyGoals to use the edge function instead of RPC directly
 export async function getStudyGoals(): Promise<StudyGoal[]> {
   try {
     const { data: session } = await supabase.auth.getSession();
     if (!session?.session?.user) return [];
 
-    // Use RPC to get study goals
-    const { data, error } = await supabase.rpc('get_user_study_goals', {
-      p_user_id: session.session.user.id
+    // Use the edge function to get study goals
+    const { data, error } = await supabase.functions.invoke('database-helpers', {
+      body: {
+        name: 'get_user_study_goals',
+        params: {
+          p_user_id: session.session.user.id
+        }
+      }
     });
 
     if (error) {
@@ -394,7 +411,7 @@ export async function getStudyGoals(): Promise<StudyGoal[]> {
     }
 
     // Map the data to the StudyGoal type
-    return (data || []).map((goal: any) => ({
+    return (data?.data || []).map((goal: any) => ({
       id: goal.id,
       userId: goal.user_id,
       type: goal.goal_type as 'book' | 'quiz-performance' | 'reading-streak' | 'chapters-read',
@@ -410,19 +427,24 @@ export async function getStudyGoals(): Promise<StudyGoal[]> {
   }
 }
 
-// Update updateStudyGoal to use the correct table
+// Update updateStudyGoal to use the edge function instead of RPC directly
 export async function updateStudyGoal(goalId: string, updates: Partial<Omit<StudyGoal, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>): Promise<boolean> {
   try {
     const { data: session } = await supabase.auth.getSession();
     if (!session?.session?.user) return false;
 
-    // Use RPC to update goal
-    const { error } = await supabase.rpc('update_study_goal', {
-      p_goal_id: goalId,
-      p_user_id: session.session.user.id,
-      p_progress: updates.progress,
-      p_completed: updates.completed,
-      p_target_value: updates.target ? String(updates.target) : undefined
+    // Use the edge function to update the goal
+    const { error } = await supabase.functions.invoke('database-helpers', {
+      body: {
+        name: 'update_study_goal',
+        params: {
+          p_goal_id: goalId,
+          p_user_id: session.session.user.id,
+          p_progress: updates.progress,
+          p_completed: updates.completed,
+          p_target_value: updates.target ? String(updates.target) : undefined
+        }
+      }
     });
 
     if (error) {
