@@ -338,7 +338,13 @@ export const getAllReadingProgress = async (): Promise<ReadingProgress[]> => {
       
     if (error) throw error;
     
-    return data || [];
+    // Map the database fields to match the ReadingProgress interface
+    return (data || []).map(item => ({
+      book: item.book,
+      chapter: item.chapter,
+      lastRead: item.last_read, // Map snake_case to camelCase
+      completed: item.completed
+    }));
   } catch (error) {
     console.error("Error getting reading progress:", error);
     return [];
