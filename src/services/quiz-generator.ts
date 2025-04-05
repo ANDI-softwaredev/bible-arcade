@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { trackReadingActivity } from "./bible-api";
 
@@ -293,7 +292,7 @@ async function checkAndUpdateQuizBadges(userId: string): Promise<void> {
         badge_description: highestBadge.description,
         badge_icon: highestBadge.icon,
         earned_at: new Date().toISOString()
-      });
+      }, { onConflict: 'user_id, badge_id' });
       
     if (badgeError) {
       console.error("Error updating badges:", badgeError);
@@ -327,7 +326,7 @@ export async function getQuizResults() {
   }
 }
 
-// Function to get user badges
+// Update getUserBadges to use the correct table
 export async function getUserBadges() {
   try {
     const { data: session } = await supabase.auth.getSession();
@@ -351,7 +350,7 @@ export async function getUserBadges() {
   }
 }
 
-// Function to save a study goal
+// Update saveStudyGoal to handle goal creation
 export async function saveStudyGoal(goal: Omit<StudyGoal, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<boolean> {
   try {
     const { data: session } = await supabase.auth.getSession();
@@ -362,7 +361,7 @@ export async function saveStudyGoal(goal: Omit<StudyGoal, 'id' | 'userId' | 'cre
       .insert({
         user_id: session.session.user.id,
         goal_type: goal.type,
-        target_value: goal.target,
+        target_value: String(goal.target),
         progress: goal.progress,
         completed: goal.completed
       });
@@ -379,7 +378,7 @@ export async function saveStudyGoal(goal: Omit<StudyGoal, 'id' | 'userId' | 'cre
   }
 }
 
-// Function to get user study goals
+// Update getStudyGoals to use the correct table and mapping
 export async function getStudyGoals(): Promise<StudyGoal[]> {
   try {
     const { data: session } = await supabase.auth.getSession();
@@ -401,8 +400,8 @@ export async function getStudyGoals(): Promise<StudyGoal[]> {
       userId: goal.user_id,
       type: goal.goal_type as 'book' | 'quiz-performance' | 'reading-streak' | 'chapters-read',
       target: goal.target_value,
-      progress: goal.progress,
-      completed: goal.completed,
+      progress: goal.progress || 0,
+      completed: goal.completed || false,
       createdAt: goal.created_at,
       updatedAt: goal.updated_at
     }));
@@ -412,7 +411,7 @@ export async function getStudyGoals(): Promise<StudyGoal[]> {
   }
 }
 
-// Function to update a study goal
+// Update updateStudyGoal to use the correct table
 export async function updateStudyGoal(goalId: string, updates: Partial<Omit<StudyGoal, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>): Promise<boolean> {
   try {
     const { data: session } = await supabase.auth.getSession();
@@ -421,7 +420,7 @@ export async function updateStudyGoal(goalId: string, updates: Partial<Omit<Stud
     const updateData: any = {};
     if (updates.progress !== undefined) updateData.progress = updates.progress;
     if (updates.completed !== undefined) updateData.completed = updates.completed;
-    if (updates.target !== undefined) updateData.target_value = updates.target;
+    if (updates.target !== undefined) updateData.target_value = String(updates.target);
     updateData.updated_at = new Date().toISOString();
 
     const { error } = await supabase

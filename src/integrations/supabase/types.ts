@@ -149,6 +149,8 @@ export type Database = {
           completed_at: string
           correct_answers: number
           id: string
+          performance_metrics: Json | null
+          questions: Json | null
           quiz_id: string | null
           score: number
           time_bonus: number | null
@@ -160,6 +162,8 @@ export type Database = {
           completed_at?: string
           correct_answers: number
           id?: string
+          performance_metrics?: Json | null
+          questions?: Json | null
           quiz_id?: string | null
           score: number
           time_bonus?: number | null
@@ -171,6 +175,8 @@ export type Database = {
           completed_at?: string
           correct_answers?: number
           id?: string
+          performance_metrics?: Json | null
+          questions?: Json | null
           quiz_id?: string | null
           score?: number
           time_bonus?: number | null
@@ -218,6 +224,36 @@ export type Database = {
         }
         Relationships: []
       }
+      user_badges: {
+        Row: {
+          badge_description: string
+          badge_icon: string
+          badge_id: string
+          badge_title: string
+          earned_at: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          badge_description: string
+          badge_icon: string
+          badge_id: string
+          badge_title: string
+          earned_at?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          badge_description?: string
+          badge_icon?: string
+          badge_id?: string
+          badge_title?: string
+          earned_at?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_reading_activity: {
         Row: {
           book: string
@@ -238,6 +274,39 @@ export type Database = {
           chapter?: number
           id?: string
           read_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_study_goals: {
+        Row: {
+          completed: boolean | null
+          created_at: string | null
+          goal_type: string
+          id: string
+          progress: number | null
+          target_value: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean | null
+          created_at?: string | null
+          goal_type: string
+          id?: string
+          progress?: number | null
+          target_value: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          completed?: boolean | null
+          created_at?: string | null
+          goal_type?: string
+          id?: string
+          progress?: number | null
+          target_value?: string
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: []
