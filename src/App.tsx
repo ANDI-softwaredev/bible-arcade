@@ -11,7 +11,6 @@ import Login from '@/pages/Login';
 import Register from '@/pages/Register';
 import Dashboard from '@/pages/Dashboard';
 import BibleStudy from '@/pages/BibleStudy';
-import Study from '@/pages/Study';
 import Progress from '@/pages/Progress';
 import MobileAR from '@/pages/MobileAR';
 import CustomQuiz from '@/pages/CustomQuiz';
@@ -34,7 +33,7 @@ function App() {
               <Route path="/register" element={<Register />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/study" element={<Study />} />
+              <Route path="/study" element={<BibleStudy />} />
               <Route path="/biblestudy/:book?/:chapter?" element={<BibleStudy />} />
               <Route path="/progress" element={<Progress />} />
               <Route path="/ar" element={<MobileAR />} />

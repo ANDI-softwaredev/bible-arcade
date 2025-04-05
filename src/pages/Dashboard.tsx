@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { BookOpen, Calendar, Clock, BookMarked, BarChart2 } from "lucide-react";
+import { BookOpen, Calendar, Clock, BookMarked, BarChart2, CheckSquare, Award } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { StatCard } from "@/components/ui/stat-card";
 import { ProgressCard } from "@/components/ui/progress-card";
@@ -19,7 +19,11 @@ import {
   getWeeklyReadingData,
   getWeeklyReadingTime
 } from "@/services/bible-api";
-import { getQuizResults } from "@/services/quiz-generator";
+import { getQuizResults, getStudyGoals, StudyGoal } from "@/services/quiz-generator";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 
 const Dashboard = () => {
   const { user, profile } = useAuth();
@@ -29,6 +33,7 @@ const Dashboard = () => {
   const [weeklyReading, setWeeklyReading] = useState(0);
   const [completedStudies, setCompletedStudies] = useState(0);
   const [quizzesTaken, setQuizzesTaken] = useState(0);
+  const [userGoals, setUserGoals] = useState<StudyGoal[]>([]);
   const [bibleProgress, setBibleProgress] = useState({
     overall: 0,
     oldTestament: 0,
@@ -52,6 +57,9 @@ const Dashboard = () => {
         const quizResults = await getQuizResults();
         const numQuizzesTaken = quizResults.length;
         
+        // Get user goals
+        const goals = await getStudyGoals();
+        
         // Get reading statistics from database
         const streak = await getStudyStreak();
         console.log("Fetched study streak:", streak);
@@ -74,6 +82,7 @@ const Dashboard = () => {
         setStudyStreak(streak);
         setWeeklyReading(weeklyHours);
         setProgressData(chartData);
+        setUserGoals(goals);
         
         setLoading(false);
       } catch (error) {
@@ -95,6 +104,69 @@ const Dashboard = () => {
     if (hours < 12) return "morning";
     if (hours < 18) return "afternoon";
     return "evening";
+  };
+
+  // Render a goal card based on its type
+  const renderGoalCard = (goal: StudyGoal) => {
+    // Calculate progress percentage
+    let progressPercentage = 0;
+    let goalText = '';
+    let icon;
+    
+    switch (goal.type) {
+      case 'book':
+        icon = <BookOpen className="h-4 w-4 text-primary" />;
+        goalText = `Read the book of ${goal.target}`;
+        progressPercentage = goal.progress;
+        break;
+      case 'quiz-performance':
+        icon = <Award className="h-4 w-4 text-amber-500" />;
+        goalText = `Achieve ${goal.target}% quiz score`;
+        progressPercentage = goal.progress;
+        break;
+      case 'reading-streak':
+        icon = <Calendar className="h-4 w-4 text-green-500" />;
+        goalText = `${goal.target}-day reading streak`;
+        progressPercentage = (goal.progress / Number(goal.target)) * 100;
+        break;
+      case 'chapters-read':
+        icon = <BookOpen className="h-4 w-4 text-blue-500" />;
+        goalText = `Read ${goal.target} chapters`;
+        progressPercentage = (goal.progress / Number(goal.target)) * 100;
+        break;
+      default:
+        icon = <CheckSquare className="h-4 w-4 text-primary" />;
+        goalText = `Complete ${goal.target} goal`;
+        progressPercentage = goal.progress;
+    }
+
+    return (
+      <div key={goal.id} className="bg-card/40 p-4 rounded-lg">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            {icon}
+            <span className="text-sm font-medium">{goalText}</span>
+          </div>
+          {goal.completed && (
+            <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200 text-xs">
+              Completed
+            </Badge>
+          )}
+        </div>
+        <div className="space-y-1">
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground">Progress</span>
+            <span className="font-medium">
+              {goal.type === 'reading-streak' || goal.type === 'chapters-read' 
+                ? `${goal.progress} / ${goal.target}` 
+                : `${Math.round(progressPercentage)}%`
+              }
+            </span>
+          </div>
+          <Progress value={progressPercentage} className="h-1.5" />
+        </div>
+      </div>
+    );
   };
   
   if (loading) {
@@ -162,22 +234,26 @@ const Dashboard = () => {
           </div>
           
           <div className="space-y-4">
-            <h2 className="text-xl font-semibold mb-4">Your Goals</h2>
-            <ProgressCard 
-              title="Overall Bible Reading" 
-              value={bibleProgress.overall} 
-              icon={<BookOpen className="h-4 w-4 text-primary" />}
-            />
-            <ProgressCard 
-              title="New Testament" 
-              value={bibleProgress.newTestament} 
-              icon={<BookMarked className="h-4 w-4 text-primary" />}
-            />
-            <ProgressCard 
-              title="Old Testament" 
-              value={bibleProgress.oldTestament} 
-              icon={<BarChart2 className="h-4 w-4 text-primary" />}
-            />
+            <div>
+              <h2 className="text-xl font-semibold mb-4">Bible Reading Goals</h2>
+              <div className="space-y-3">
+                <ProgressCard 
+                  title="Overall Bible Reading" 
+                  value={bibleProgress.overall} 
+                  icon={<BookOpen className="h-4 w-4 text-primary" />}
+                />
+                <ProgressCard 
+                  title="New Testament" 
+                  value={bibleProgress.newTestament} 
+                  icon={<BookMarked className="h-4 w-4 text-primary" />}
+                />
+                <ProgressCard 
+                  title="Old Testament" 
+                  value={bibleProgress.oldTestament} 
+                  icon={<BarChart2 className="h-4 w-4 text-primary" />}
+                />
+              </div>
+            </div>
             
             {/* Latest Achievement */}
             <div className="mt-4">
@@ -185,6 +261,39 @@ const Dashboard = () => {
               <UserRewards compact={true} />
             </div>
           </div>
+        </div>
+        
+        {/* Study Goals Section */}
+        <div className="mb-8">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xl">Your Study Goals</CardTitle>
+              <CardDescription>
+                Track your progress towards your personal study goals
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {userGoals.length === 0 ? (
+                <div className="text-center py-4">
+                  <p className="text-muted-foreground">You haven't set any study goals yet.</p>
+                  <a href="/goals" className="text-primary hover:underline text-sm mt-2 inline-block">
+                    Set your first goal
+                  </a>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {userGoals.slice(0, 4).map(goal => renderGoalCard(goal))}
+                </div>
+              )}
+              {userGoals.length > 0 && (
+                <div className="mt-4 text-center">
+                  <a href="/goals" className="text-primary hover:underline text-sm">
+                    View all goals
+                  </a>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
         
         {/* Learning Plan Generator */}
@@ -219,7 +328,7 @@ const Dashboard = () => {
   );
 };
 
-// Pre-defined study modules (could be moved to a separate data file)
+// Pre-defined study modules
 const studyModules = [
   {
     id: 1,
@@ -228,7 +337,7 @@ const studyModules = [
     progress: 65,
     image: "https://images.unsplash.com/photo-1504052434569-70ad5836ab65?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2670&q=80",
     chip: "New Testament",
-    href: "/study/john"
+    href: "/biblestudy/john"
   },
   {
     id: 2,
@@ -237,7 +346,7 @@ const studyModules = [
     progress: 42,
     image: "https://images.unsplash.com/photo-1602525665453-7483caed6e3a?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2670&q=80",
     chip: "Old Testament",
-    href: "/study/psalms"
+    href: "/biblestudy/psalms"
   },
   {
     id: 3,
@@ -246,7 +355,7 @@ const studyModules = [
     progress: 78,
     image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2673&q=80",
     chip: "New Testament",
-    href: "/study/acts"
+    href: "/biblestudy/acts"
   },
 ];
 
