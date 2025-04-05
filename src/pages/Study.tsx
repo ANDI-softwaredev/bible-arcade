@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Search, BookOpen, Filter, CheckSquare } from "lucide-react";
 import { motion } from "framer-motion";
@@ -5,7 +6,7 @@ import { Layout } from "@/components/layout";
 import { Input } from "@/components/ui/input";
 import { StudyCard } from "@/components/ui/study-card";
 import { cn } from "@/lib/utils";
-import { BibleReaderAdapter } from "@/components/bible-reader-adapter";
+import BibleReaderAdapter from "@/components/bible-reader-adapter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { VerseLoading } from "@/components/ui/verse-loading";
