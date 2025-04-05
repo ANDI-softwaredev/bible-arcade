@@ -27,6 +27,73 @@ export interface GeneratedQuiz {
   questions: QuizQuestion[];
 }
 
+// Badge reward tiers for quiz achievements
+export interface QuizBadge {
+  id: string;
+  title: string;
+  description: string;
+  threshold: number;
+  icon: string;
+}
+
+// User goals interface
+export interface StudyGoal {
+  id: string;
+  userId: string;
+  type: 'book' | 'quiz-performance' | 'reading-streak' | 'chapters-read';
+  target: number | string;
+  progress: number;
+  completed: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Quiz badges based on number of quizzes taken
+export const quizBadges: QuizBadge[] = [
+  {
+    id: 'quiz-novice',
+    title: 'Quiz Novice',
+    description: 'Completed 5 quizzes',
+    threshold: 5,
+    icon: 'award'
+  },
+  {
+    id: 'quiz-master',
+    title: 'Quiz Master',
+    description: 'Completed 10 quizzes',
+    threshold: 10,
+    icon: 'award'
+  },
+  {
+    id: 'quiz-master-pro',
+    title: 'Quiz Master Pro',
+    description: 'Completed 20 quizzes',
+    threshold: 20,
+    icon: 'badge'
+  },
+  {
+    id: 'quiz-master-expert',
+    title: 'Quiz Master Expert',
+    description: 'Completed 30 quizzes',
+    threshold: 30,
+    icon: 'badge-check'
+  },
+  {
+    id: 'quiz-scholar',
+    title: 'Quiz Scholar',
+    description: 'Completed 40 quizzes',
+    threshold: 40,
+    icon: 'badge-check'
+  },
+  {
+    id: 'quiz-master-pro-max',
+    title: 'Quiz Master Pro Max',
+    description: 'Completed 50 quizzes',
+    threshold: 50,
+    icon: 'star'
+  }
+];
+
 // Function to generate a quiz based on a book and number of questions
 export async function generateQuiz(book: string, numQuestions: number) {
   try {
@@ -182,10 +249,57 @@ export async function saveQuizResult(quizData: {
       return false;
     }
 
+    // After saving the quiz result, check for badge unlocks
+    await checkAndUpdateQuizBadges(userId);
+    
     return true;
   } catch (error) {
     console.error("Error saving quiz results:", error);
     return false;
+  }
+}
+
+// Function to check and update quiz badges
+async function checkAndUpdateQuizBadges(userId: string): Promise<void> {
+  try {
+    // Get total number of quizzes taken
+    const { data: quizResults, error } = await supabase
+      .from('quiz_results')
+      .select('*')
+      .eq('user_id', userId);
+      
+    if (error) {
+      console.error("Error getting quiz results for badges:", error);
+      return;
+    }
+    
+    const quizCount = quizResults?.length || 0;
+    
+    // Find the highest badge earned
+    const earnedBadges = quizBadges.filter(badge => quizCount >= badge.threshold);
+    if (earnedBadges.length === 0) return;
+    
+    // Get the highest tier badge earned
+    const highestBadge = earnedBadges.reduce((prev, current) => 
+      (prev.threshold > current.threshold) ? prev : current, earnedBadges[0]);
+    
+    // Update or insert the badge record
+    const { error: badgeError } = await supabase
+      .from('user_badges')
+      .upsert({
+        user_id: userId,
+        badge_id: highestBadge.id,
+        badge_title: highestBadge.title,
+        badge_description: highestBadge.description,
+        badge_icon: highestBadge.icon,
+        earned_at: new Date().toISOString()
+      });
+      
+    if (badgeError) {
+      console.error("Error updating badges:", badgeError);
+    }
+  } catch (error) {
+    console.error("Error in badge processing:", error);
   }
 }
 
@@ -210,6 +324,121 @@ export async function getQuizResults() {
   } catch (error) {
     console.error("Error getting quiz results:", error);
     return [];
+  }
+}
+
+// Function to get user badges
+export async function getUserBadges() {
+  try {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session?.session?.user) return [];
+
+    const { data, error } = await supabase
+      .from('user_badges')
+      .select('*')
+      .eq('user_id', session.session.user.id)
+      .order('earned_at', { ascending: false });
+
+    if (error) {
+      console.error("Error fetching user badges:", error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error("Error getting user badges:", error);
+    return [];
+  }
+}
+
+// Function to save a study goal
+export async function saveStudyGoal(goal: Omit<StudyGoal, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<boolean> {
+  try {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session?.session?.user) return false;
+
+    const { error } = await supabase
+      .from('user_study_goals')
+      .insert({
+        user_id: session.session.user.id,
+        goal_type: goal.type,
+        target_value: goal.target,
+        progress: goal.progress,
+        completed: goal.completed
+      });
+
+    if (error) {
+      console.error("Error saving study goal:", error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Error saving study goal:", error);
+    return false;
+  }
+}
+
+// Function to get user study goals
+export async function getStudyGoals(): Promise<StudyGoal[]> {
+  try {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session?.session?.user) return [];
+
+    const { data, error } = await supabase
+      .from('user_study_goals')
+      .select('*')
+      .eq('user_id', session.session.user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error("Error fetching study goals:", error);
+      return [];
+    }
+
+    return (data || []).map(goal => ({
+      id: goal.id,
+      userId: goal.user_id,
+      type: goal.goal_type as 'book' | 'quiz-performance' | 'reading-streak' | 'chapters-read',
+      target: goal.target_value,
+      progress: goal.progress,
+      completed: goal.completed,
+      createdAt: goal.created_at,
+      updatedAt: goal.updated_at
+    }));
+  } catch (error) {
+    console.error("Error getting study goals:", error);
+    return [];
+  }
+}
+
+// Function to update a study goal
+export async function updateStudyGoal(goalId: string, updates: Partial<Omit<StudyGoal, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>): Promise<boolean> {
+  try {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session?.session?.user) return false;
+
+    const updateData: any = {};
+    if (updates.progress !== undefined) updateData.progress = updates.progress;
+    if (updates.completed !== undefined) updateData.completed = updates.completed;
+    if (updates.target !== undefined) updateData.target_value = updates.target;
+    updateData.updated_at = new Date().toISOString();
+
+    const { error } = await supabase
+      .from('user_study_goals')
+      .update(updateData)
+      .eq('id', goalId)
+      .eq('user_id', session.session.user.id);
+
+    if (error) {
+      console.error("Error updating study goal:", error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Error updating study goal:", error);
+    return false;
   }
 }
 

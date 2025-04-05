@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +14,7 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { CheckCircle, XCircle, AlertCircle, BookText, Clock, Trophy } from "lucide-react";
+import { CheckCircle, XCircle, AlertCircle, BookText, Clock, Trophy, Award } from "lucide-react";
 import { GrowingSeedAnimation } from "@/components/ui/growing-seed-animation";
 import { 
   bibleBooks, 
@@ -26,7 +27,7 @@ import {
   difficultySettings
 } from "@/data/bible-database";
 import { useToast } from "@/hooks/use-toast";
-import { saveQuizResult } from "@/services/quiz-generator";
+import { saveQuizResult, getUserBadges } from "@/services/quiz-generator";
 
 interface BibleQuizProps {
   onComplete?: (score: number, totalPossible: number, percentageScore: number) => void;
@@ -49,6 +50,9 @@ export function BibleQuiz({ onComplete }: BibleQuizProps) {
   const [score, setScore] = useState(0);
   const [totalPossible, setTotalPossible] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
+  
+  // Badge state
+  const [earnedBadge, setEarnedBadge] = useState<any>(null);
   
   // Timer state
   const [timeRemaining, setTimeRemaining] = useState(0);
@@ -208,7 +212,7 @@ export function BibleQuiz({ onComplete }: BibleQuizProps) {
   };
   
   // Finish the quiz and calculate score
-  const finishQuiz = () => {
+  const finishQuiz = async () => {
     // Clear any active timer
     if (timerRef.current) {
       clearInterval(timerRef.current);
@@ -262,7 +266,7 @@ export function BibleQuiz({ onComplete }: BibleQuizProps) {
     const timeSpent = Math.round((new Date().getTime() - quizStartTime) / 1000);
     
     // Save comprehensive quiz result for analytics
-    saveQuizResult({
+    await saveQuizResult({
       quizId: `quiz-${Date.now()}`,
       score: calculatedScore,
       timeSpent: timeSpent,
@@ -274,6 +278,16 @@ export function BibleQuiz({ onComplete }: BibleQuizProps) {
       topics: topics,
       completedAt: new Date().toISOString()
     });
+    
+    // Check if user has received a new badge
+    try {
+      const userBadges = await getUserBadges();
+      if (userBadges && userBadges.length > 0) {
+        setEarnedBadge(userBadges[0]); // Show the most recent badge
+      }
+    } catch (error) {
+      console.error("Error getting user badges:", error);
+    }
     
     // Notify parent component
     if (onComplete) {
@@ -297,6 +311,7 @@ export function BibleQuiz({ onComplete }: BibleQuizProps) {
     setQuizStarted(false);
     setQuizCompleted(false);
     setIsTimeUp(false);
+    setEarnedBadge(null);
   };
   
   // Get the timer color based on remaining time percentage
@@ -500,6 +515,22 @@ export function BibleQuiz({ onComplete }: BibleQuizProps) {
           value={percentageScore} 
           className="h-3" 
         />
+        
+        {/* Show earned badge if any */}
+        {earnedBadge && (
+          <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 my-4">
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 flex items-center justify-center rounded-full bg-blue-100">
+                <Award className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <div className="font-medium text-blue-800">Achievement Unlocked!</div>
+                <div className="text-blue-600 font-bold text-lg">{earnedBadge.badge_title}</div>
+                <div className="text-sm text-blue-600">{earnedBadge.badge_description}</div>
+              </div>
+            </div>
+          </div>
+        )}
         
         <div className="space-y-4">
           <h3 className="font-medium text-lg">Question Review</h3>

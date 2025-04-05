@@ -7,6 +7,7 @@ import { ProgressCard } from "@/components/ui/progress-card";
 import { StudyCard } from "@/components/ui/study-card";
 import { ProgressChart } from "@/components/progress-chart";
 import { LearningPlanGenerator } from "@/components/learning-plan-generator";
+import { UserRewards } from "@/components/user-rewards";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { 
@@ -177,6 +178,12 @@ const Dashboard = () => {
               value={bibleProgress.oldTestament} 
               icon={<BarChart2 className="h-4 w-4 text-primary" />}
             />
+            
+            {/* Latest Achievement */}
+            <div className="mt-4">
+              <h2 className="text-lg font-semibold mb-2">Latest Achievement</h2>
+              <UserRewards compact={true} />
+            </div>
           </div>
         </div>
         
