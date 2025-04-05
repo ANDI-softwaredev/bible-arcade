@@ -195,6 +195,7 @@ export type Database = {
           completed: boolean
           id: string
           last_read: string
+          read_date: string
           user_id: string
         }
         Insert: {
@@ -203,6 +204,7 @@ export type Database = {
           completed?: boolean
           id?: string
           last_read?: string
+          read_date?: string
           user_id: string
         }
         Update: {
@@ -211,6 +213,52 @@ export type Database = {
           completed?: boolean
           id?: string
           last_read?: string
+          read_date?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_reading_activity: {
+        Row: {
+          book: string
+          chapter: number
+          id: string
+          read_at: string
+          user_id: string
+        }
+        Insert: {
+          book: string
+          chapter: number
+          id?: string
+          read_at?: string
+          user_id: string
+        }
+        Update: {
+          book?: string
+          chapter?: number
+          id?: string
+          read_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_study_streaks: {
+        Row: {
+          activity_count: number
+          id: string
+          streak_date: string
+          user_id: string
+        }
+        Insert: {
+          activity_count?: number
+          id?: string
+          streak_date?: string
+          user_id: string
+        }
+        Update: {
+          activity_count?: number
+          id?: string
+          streak_date?: string
           user_id?: string
         }
         Relationships: []

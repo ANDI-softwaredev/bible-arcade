@@ -1,7 +1,7 @@
-
 // Import necessary libraries
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
+import { supabase } from './supabase'; // Assuming supabase client is imported
 
 // API configuration
 const API_BASE_URL = 'https://api.scripture.api.bible/v1';
@@ -372,3 +372,214 @@ export const getCompletedBooks = async (): Promise<string[]> => {
   // Mock implementation
   return ["John", "Mark", "1 John", "Jude"];
 };
+
+// Function to track reading activity
+export async function trackReadingActivity(book: string, chapter: number): Promise<void> {
+  try {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session?.session?.user) return;
+
+    // Record the reading activity
+    await supabase
+      .from('user_reading_activity')
+      .insert({
+        user_id: session.session.user.id,
+        book,
+        chapter,
+        read_at: new Date().toISOString()
+      });
+
+    // Update/Insert study streak for today
+    const today = new Date().toISOString().split('T')[0];
+    
+    const { data: existingStreak } = await supabase
+      .from('user_study_streaks')
+      .select('*')
+      .eq('user_id', session.session.user.id)
+      .eq('streak_date', today)
+      .single();
+      
+    if (existingStreak) {
+      // Update streak count
+      await supabase
+        .from('user_study_streaks')
+        .update({ activity_count: existingStreak.activity_count + 1 })
+        .eq('id', existingStreak.id);
+    } else {
+      // Create new streak entry for today
+      await supabase
+        .from('user_study_streaks')
+        .insert({
+          user_id: session.session.user.id,
+          streak_date: today,
+          activity_count: 1
+        });
+    }
+
+    console.log("Reading activity and streak recorded");
+  } catch (error) {
+    console.error("Error tracking reading activity:", error);
+  }
+}
+
+// Get study streak (consecutive days with activity)
+export async function getStudyStreak(): Promise<number> {
+  try {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session?.session?.user) return 0;
+
+    // Get all streak data for the user, ordered by date descending
+    const { data: streakDays } = await supabase
+      .from('user_study_streaks')
+      .select('streak_date')
+      .eq('user_id', session.session.user.id)
+      .order('streak_date', { ascending: false });
+
+    if (!streakDays || streakDays.length === 0) return 0;
+
+    // Convert streak dates to Date objects
+    const dates = streakDays.map(day => new Date(day.streak_date));
+    
+    // Start from today or the most recent study date
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const mostRecentDate = new Date(Math.max(...dates.map(d => d.getTime())));
+    mostRecentDate.setHours(0, 0, 0, 0);
+    
+    // If most recent activity was more than a day ago, streak is broken
+    const dayDiff = Math.floor((today.getTime() - mostRecentDate.getTime()) / (1000 * 60 * 60 * 24));
+    if (dayDiff > 1) return 0;
+    
+    // Count consecutive days
+    let streak = 1; // Start with 1 for the most recent day
+    let currentDate = new Date(mostRecentDate);
+    
+    for (let i = 1; i <= 365; i++) { // Check up to a year back
+      currentDate.setDate(currentDate.getDate() - 1);
+      const dateString = currentDate.toISOString().split('T')[0];
+      
+      // Check if there was activity on this day
+      const hadActivity = dates.some(d => d.toISOString().split('T')[0] === dateString);
+      
+      if (hadActivity) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+    
+    return streak;
+  } catch (error) {
+    console.error("Error calculating study streak:", error);
+    return 0;
+  }
+}
+
+// Get chapters read count
+export async function getChaptersReadCount(): Promise<number> {
+  try {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session?.session?.user) return 0;
+
+    const { count } = await supabase
+      .from('reading_progress')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', session.session.user.id)
+      .eq('completed', true);
+
+    return count || 0;
+  } catch (error) {
+    console.error("Error counting chapters read:", error);
+    return 0;
+  }
+}
+
+// Get weekly reading data for chart
+export async function getWeeklyReadingData(): Promise<{ name: string; completion: number }[]> {
+  try {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session?.session?.user) return generateDefaultWeeklyData();
+
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const result = [];
+
+    // Get data for the last 7 days
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(today.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      // Get activity count for this day
+      const { data: activities } = await supabase
+        .from('user_reading_activity')
+        .select('id')
+        .eq('user_id', session.session.user.id)
+        .gte('read_at', `${dateStr}T00:00:00Z`)
+        .lt('read_at', `${dateStr}T23:59:59Z`);
+        
+      // Calculate completion percentage (max 100%)
+      const activityCount = activities?.length || 0;
+      const completion = Math.min(100, activityCount * 10);
+      
+      result.push({
+        name: days[(dayOfWeek - i + 7) % 7],
+        completion: completion
+      });
+    }
+    
+    return result;
+  } catch (error) {
+    console.error("Error getting weekly reading data:", error);
+    return generateDefaultWeeklyData();
+  }
+}
+
+// Generate default weekly data for fallback
+function generateDefaultWeeklyData(): { name: string; completion: number }[] {
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+  const result = [];
+  
+  for (let i = 6; i >= 0; i--) {
+    result.push({
+      name: days[(dayOfWeek - i + 7) % 7],
+      completion: 0
+    });
+  }
+  
+  return result;
+}
+
+// Get reading time for the week
+export async function getWeeklyReadingTime(): Promise<number> {
+  try {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session?.session?.user) return 0;
+
+    // Get timeframe for the last 7 days
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    
+    // Get count of chapters read in the last week
+    const { data } = await supabase
+      .from('user_reading_activity')
+      .select('id')
+      .eq('user_id', session.session.user.id)
+      .gte('read_at', oneWeekAgo.toISOString());
+    
+    // Approximate reading time based on chapter count
+    // Assume average of 10 minutes per chapter
+    const chaptersRead = data?.length || 0;
+    const readingTimeHours = (chaptersRead * 10) / 60;
+    
+    return parseFloat(readingTimeHours.toFixed(1));
+  } catch (error) {
+    console.error("Error calculating weekly reading time:", error);
+    return 0;
+  }
+}

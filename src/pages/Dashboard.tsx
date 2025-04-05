@@ -12,8 +12,11 @@ import { GrowingSeedAnimation } from "@/components/ui/growing-seed-animation";
 import { 
   calculateOverallProgress, 
   calculateTestamentProgress,
-  getAllReadingProgress,
-  getCompletedBooks
+  getCompletedBooks,
+  getStudyStreak,
+  getChaptersReadCount,
+  getWeeklyReadingData,
+  getWeeklyReadingTime
 } from "@/services/bible-api";
 import { getQuizResults } from "@/services/quiz-generator";
 
@@ -40,14 +43,19 @@ const Dashboard = () => {
         const overall = await calculateOverallProgress();
         const oldTestament = await calculateTestamentProgress("OT");
         const newTestament = await calculateTestamentProgress("NT");
-        const allProgress = await getAllReadingProgress();
         const completedBooks = await getCompletedBooks();
-        const chaptersRead = allProgress.length;
         
         // Get quiz results
         const quizResults = await getQuizResults();
         const numQuizzesTaken = quizResults.length;
         
+        // Get reading statistics from database
+        const streak = await getStudyStreak();
+        const chaptersRead = await getChaptersReadCount();
+        const weeklyHours = await getWeeklyReadingTime();
+        const chartData = await getWeeklyReadingData();
+        
+        // Update state with fetched data
         setBibleProgress({
           overall,
           oldTestament,
@@ -57,19 +65,8 @@ const Dashboard = () => {
         
         setCompletedStudies(completedBooks.length);
         setQuizzesTaken(numQuizzesTaken);
-        
-        // Calculate study streak
-        const streak = calculateStudyStreak(allProgress);
         setStudyStreak(streak);
-        
-        // Calculate weekly reading hours (approximate based on completed chapters)
-        // Assuming average reading time of 10 minutes per chapter
-        const recentReadings = getRecentReadings(allProgress, 7); // last 7 days
-        const weeklyHours = (recentReadings.length * 10 / 60).toFixed(1);
-        setWeeklyReading(parseFloat(weeklyHours));
-        
-        // Generate weekly progress data for chart
-        const chartData = generateWeeklyProgressData(allProgress);
+        setWeeklyReading(weeklyHours);
         setProgressData(chartData);
         
         setLoading(false);
@@ -86,104 +83,6 @@ const Dashboard = () => {
     
     fetchUserData();
   }, []);
-  
-  // Function to calculate study streak based on reading progress
-  const calculateStudyStreak = (progress) => {
-    if (!progress || progress.length === 0) return 0;
-    
-    // Sort by date (newest first)
-    const sortedProgress = [...progress].sort((a, b) => 
-      new Date(b.lastRead).getTime() - new Date(a.lastRead).getTime()
-    );
-    
-    // Check if user has read today
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const latestReadDate = new Date(sortedProgress[0].lastRead);
-    latestReadDate.setHours(0, 0, 0, 0);
-    
-    // If latest reading is not from today or yesterday, streak is broken
-    const diff = (today.getTime() - latestReadDate.getTime()) / (1000 * 60 * 60 * 24);
-    if (diff > 1) return 0;
-    
-    // Count consecutive days
-    let streak = 1;
-    let currentDate = latestReadDate;
-    
-    // Group readings by date
-    const readingsByDate = {};
-    sortedProgress.forEach(item => {
-      const date = new Date(item.lastRead);
-      date.setHours(0, 0, 0, 0);
-      const dateString = date.toISOString().split('T')[0];
-      if (!readingsByDate[dateString]) {
-        readingsByDate[dateString] = [];
-      }
-      readingsByDate[dateString].push(item);
-    });
-    
-    // Count consecutive days
-    for (let i = 1; i <= 30; i++) { // Check up to 30 days back
-      const prevDate = new Date(currentDate);
-      prevDate.setDate(prevDate.getDate() - 1);
-      const prevDateStr = prevDate.toISOString().split('T')[0];
-      
-      if (readingsByDate[prevDateStr]) {
-        streak++;
-        currentDate = prevDate;
-      } else {
-        break;
-      }
-    }
-    
-    return streak;
-  };
-  
-  // Get readings from the past n days
-  const getRecentReadings = (progress, days) => {
-    if (!progress || progress.length === 0) return [];
-    
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - days);
-    
-    return progress.filter(item => {
-      const readDate = new Date(item.lastRead);
-      return readDate >= cutoffDate;
-    });
-  };
-  
-  // Generate weekly progress data for chart
-  const generateWeeklyProgressData = (progress) => {
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const today = new Date();
-    const dayOfWeek = today.getDay();
-    const result = [];
-    
-    // Generate data for the last 7 days
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(today.getDate() - i);
-      date.setHours(0, 0, 0, 0);
-      const dateStr = date.toISOString().split('T')[0];
-      
-      // Count chapters read on this day
-      const dayReadings = progress.filter(item => {
-        const readDate = new Date(item.lastRead);
-        readDate.setHours(0, 0, 0, 0);
-        return readDate.toISOString().split('T')[0] === dateStr;
-      });
-      
-      // Calculate completion percentage (max 100%)
-      const completion = Math.min(100, dayReadings.length * 10);
-      
-      result.push({
-        name: days[(dayOfWeek - i + 7) % 7],
-        completion: completion || 0
-      });
-    }
-    
-    return result;
-  };
   
   const getCurrentTime = () => {
     const hours = new Date().getHours();
@@ -239,7 +138,7 @@ const Dashboard = () => {
             title="Chapters Read" 
             value={bibleProgress.chaptersRead.toString()} 
             icon={<BookOpen className="h-4 w-4 text-primary" />}
-            trend={bibleProgress.chaptersRead > 0 ? { value: 4, positive: true } : undefined}
+            trend={bibleProgress.chaptersRead > 0 ? { value: bibleProgress.chaptersRead, positive: true } : undefined}
           />
         </div>
         
