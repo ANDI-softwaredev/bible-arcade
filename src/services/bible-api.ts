@@ -1,7 +1,7 @@
 // Import necessary libraries
-import axios from 'axios';
-import { v4 as uuidv4 } from 'uuid';
-import { supabase } from './supabase'; // Assuming supabase client is imported
+import axios from "axios";
+import { v4 as uuidv4 } from "uuid";
+import { supabase } from "@/integrations/supabase/client"; // Updated import path
 
 // API configuration
 const API_BASE_URL = 'https://api.scripture.api.bible/v1';
@@ -262,7 +262,7 @@ export const getReadingPlan = async (planId: string): Promise<any> => {
 
 // Mark reading as completed
 export const markReadingCompleted = async (planId: string, day: number): Promise<boolean> => {
-  // Mock implementation
+  // Mock implementation to mark reading as completed
   console.log(`Marked day ${day} of plan ${planId} as completed`);
   return true;
 };
