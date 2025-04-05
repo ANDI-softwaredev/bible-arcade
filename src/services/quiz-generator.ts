@@ -283,16 +283,17 @@ async function checkAndUpdateQuizBadges(userId: string): Promise<void> {
       (prev.threshold > current.threshold) ? prev : current, earnedBadges[0]);
     
     // Update or insert the badge record
-    const { error: badgeError } = await supabase
-      .from('user_badges')
-      .upsert({
-        user_id: userId,
-        badge_id: highestBadge.id,
-        badge_title: highestBadge.title,
-        badge_description: highestBadge.description,
-        badge_icon: highestBadge.icon,
-        earned_at: new Date().toISOString()
-      }, { onConflict: 'user_id, badge_id' });
+    // We need to manually insert or update because TypeScript doesn't recognize the user_badges table yet
+    const { error: badgeError } = await supabase.rpc(
+      'upsert_user_badge',
+      {
+        p_user_id: userId,
+        p_badge_id: highestBadge.id,
+        p_badge_title: highestBadge.title,
+        p_badge_description: highestBadge.description,
+        p_badge_icon: highestBadge.icon
+      }
+    );
       
     if (badgeError) {
       console.error("Error updating badges:", badgeError);
@@ -332,11 +333,10 @@ export async function getUserBadges() {
     const { data: session } = await supabase.auth.getSession();
     if (!session?.session?.user) return [];
 
-    const { data, error } = await supabase
-      .from('user_badges')
-      .select('*')
-      .eq('user_id', session.session.user.id)
-      .order('earned_at', { ascending: false });
+    // Use a custom RPC function to get user badges
+    const { data, error } = await supabase.rpc('get_user_badges', {
+      p_user_id: session.session.user.id
+    });
 
     if (error) {
       console.error("Error fetching user badges:", error);
@@ -356,15 +356,14 @@ export async function saveStudyGoal(goal: Omit<StudyGoal, 'id' | 'userId' | 'cre
     const { data: session } = await supabase.auth.getSession();
     if (!session?.session?.user) return false;
 
-    const { error } = await supabase
-      .from('user_study_goals')
-      .insert({
-        user_id: session.session.user.id,
-        goal_type: goal.type,
-        target_value: String(goal.target),
-        progress: goal.progress,
-        completed: goal.completed
-      });
+    // Use RPC to insert goal
+    const { error } = await supabase.rpc('create_study_goal', {
+      p_user_id: session.session.user.id,
+      p_goal_type: goal.type,
+      p_target_value: String(goal.target),
+      p_progress: goal.progress,
+      p_completed: goal.completed
+    });
 
     if (error) {
       console.error("Error saving study goal:", error);
@@ -384,18 +383,18 @@ export async function getStudyGoals(): Promise<StudyGoal[]> {
     const { data: session } = await supabase.auth.getSession();
     if (!session?.session?.user) return [];
 
-    const { data, error } = await supabase
-      .from('user_study_goals')
-      .select('*')
-      .eq('user_id', session.session.user.id)
-      .order('created_at', { ascending: false });
+    // Use RPC to get study goals
+    const { data, error } = await supabase.rpc('get_user_study_goals', {
+      p_user_id: session.session.user.id
+    });
 
     if (error) {
       console.error("Error fetching study goals:", error);
       return [];
     }
 
-    return (data || []).map(goal => ({
+    // Map the data to the StudyGoal type
+    return (data || []).map((goal: any) => ({
       id: goal.id,
       userId: goal.user_id,
       type: goal.goal_type as 'book' | 'quiz-performance' | 'reading-streak' | 'chapters-read',
@@ -417,17 +416,14 @@ export async function updateStudyGoal(goalId: string, updates: Partial<Omit<Stud
     const { data: session } = await supabase.auth.getSession();
     if (!session?.session?.user) return false;
 
-    const updateData: any = {};
-    if (updates.progress !== undefined) updateData.progress = updates.progress;
-    if (updates.completed !== undefined) updateData.completed = updates.completed;
-    if (updates.target !== undefined) updateData.target_value = String(updates.target);
-    updateData.updated_at = new Date().toISOString();
-
-    const { error } = await supabase
-      .from('user_study_goals')
-      .update(updateData)
-      .eq('id', goalId)
-      .eq('user_id', session.session.user.id);
+    // Use RPC to update goal
+    const { error } = await supabase.rpc('update_study_goal', {
+      p_goal_id: goalId,
+      p_user_id: session.session.user.id,
+      p_progress: updates.progress,
+      p_completed: updates.completed,
+      p_target_value: updates.target ? String(updates.target) : undefined
+    });
 
     if (error) {
       console.error("Error updating study goal:", error);
