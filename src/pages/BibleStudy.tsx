@@ -36,6 +36,7 @@ const BibleStudy = () => {
       
       const { data: session } = await supabase.auth.getSession();
       if (!session?.session?.user) {
+        setIsLoading(false);
         return;
       }
       
@@ -46,15 +47,23 @@ const BibleStudy = () => {
         .eq('user_id', session.session.user.id)
         .eq('completed', true);
       
-      if (readingError) throw readingError;
+      if (readingError) {
+        console.error("Error fetching reading count:", readingError);
+        setIsLoading(false);
+        return;
+      }
       
-      // Get journal entries count - use journal_entries instead of journals
+      // Get journal entries count
       const { count: journalCount, error: journalError } = await supabase
         .from('journal_entries')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', session.session.user.id);
       
-      if (journalError) throw journalError;
+      if (journalError) {
+        console.error("Error fetching journal count:", journalError);
+        setIsLoading(false);
+        return;
+      }
       
       setCompletedChapters(readingCount || 0);
       setTotalJournals(journalCount || 0);

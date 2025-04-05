@@ -58,7 +58,9 @@ export function BibleReading({ onReadComplete }: BibleReadingProps) {
     const loadBooks = async () => {
       try {
         setLoading(true);
+        console.log("Loading Bible books...");
         const allBooks = await getBibleBooks();
+        console.log("Loaded books:", allBooks.length);
         setBooks(allBooks);
         
         if (allBooks.length > 0) {
@@ -116,13 +118,17 @@ export function BibleReading({ onReadComplete }: BibleReadingProps) {
         return;
       }
       
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('reading_progress')
         .select('completed')
         .eq('book', selectedBook.name)
         .eq('chapter', selectedChapter)
         .eq('user_id', session.session.user.id)
         .maybeSingle();
+      
+      if (error) {
+        console.error("Error checking reading progress:", error);
+      }
       
       setIsReadingCompleted(!!data?.completed);
     } catch (error) {
@@ -203,6 +209,7 @@ export function BibleReading({ onReadComplete }: BibleReadingProps) {
   const handleMarkComplete = async (isCompleted: boolean) => {
     if (selectedBook) {
       try {
+        console.log("Marking chapter as", isCompleted ? "complete" : "incomplete");
         const { data: session } = await supabase.auth.getSession();
         if (!session?.session?.user) {
           toast({
@@ -214,29 +221,21 @@ export function BibleReading({ onReadComplete }: BibleReadingProps) {
         }
         
         // Save locally
-        saveReadingProgress(selectedBook.name, selectedChapter);
+        const saved = await saveReadingProgress(selectedBook.name, selectedChapter);
         
-        // Save to database
-        const { error } = await supabase
-          .from('reading_progress')
-          .upsert({
-            book: selectedBook.name,
-            chapter: selectedChapter,
-            completed: isCompleted,
-            user_id: session.session.user.id
-          }, { onConflict: 'user_id, book, chapter' });
-        
-        if (error) throw error;
-        
-        setIsReadingCompleted(isCompleted);
-        
-        toast({
-          title: isCompleted ? "Reading marked as complete" : "Reading marked as incomplete",
-          description: `You've ${isCompleted ? 'completed' : 'unmarked'} ${selectedBook.name} chapter ${selectedChapter}.`,
-        });
-        
-        if (onReadComplete && isCompleted) {
-          onReadComplete(selectedBook.name, selectedChapter);
+        if (saved) {
+          setIsReadingCompleted(isCompleted);
+          
+          toast({
+            title: isCompleted ? "Reading marked as complete" : "Reading marked as incomplete",
+            description: `You've ${isCompleted ? 'completed' : 'unmarked'} ${selectedBook.name} chapter ${selectedChapter}.`,
+          });
+          
+          if (onReadComplete && isCompleted) {
+            onReadComplete(selectedBook.name, selectedChapter);
+          }
+        } else {
+          throw new Error("Failed to save reading progress");
         }
       } catch (error) {
         console.error("Error marking reading as complete:", error);
@@ -261,7 +260,14 @@ export function BibleReading({ onReadComplete }: BibleReadingProps) {
   const newTestament = books.filter(book => book.testament === "NT");
   
   if (loading && books.length === 0) {
-    return <VerseLoading />;
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <h3 className="text-lg font-medium mb-2">Loading Bible Data</h3>
+          <p className="text-muted-foreground mb-4">Please wait while we load the Bible data...</p>
+        </div>
+      </div>
+    );
   }
   
   return (
@@ -381,7 +387,12 @@ export function BibleReading({ onReadComplete }: BibleReadingProps) {
       <div className="md:col-span-5">
         <Card className="p-6 glass-card">
           {loading ? (
-            <VerseLoading />
+            <div className="flex items-center justify-center p-8">
+              <div className="text-center">
+                <h3 className="text-lg font-medium mb-2">Loading Chapter</h3>
+                <p className="text-muted-foreground">Please wait...</p>
+              </div>
+            </div>
           ) : (
             <>
               <div className="mb-6 flex items-center justify-between">

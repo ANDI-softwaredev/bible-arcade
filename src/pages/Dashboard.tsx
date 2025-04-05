@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { BookOpen, Calendar, Clock, BookMarked, BarChart2 } from "lucide-react";
 import { Layout } from "@/components/layout";
@@ -8,7 +9,6 @@ import { ProgressChart } from "@/components/progress-chart";
 import { LearningPlanGenerator } from "@/components/learning-plan-generator";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { GrowingSeedAnimation } from "@/components/ui/growing-seed-animation";
 import { 
   calculateOverallProgress, 
   calculateTestamentProgress,
@@ -39,6 +39,8 @@ const Dashboard = () => {
     // Load user data and progress statistics
     const fetchUserData = async () => {
       try {
+        console.log("Fetching user data...");
+        
         // Calculate Bible reading progress
         const overall = await calculateOverallProgress();
         const oldTestament = await calculateTestamentProgress("OT");
@@ -51,9 +53,12 @@ const Dashboard = () => {
         
         // Get reading statistics from database
         const streak = await getStudyStreak();
+        console.log("Fetched study streak:", streak);
+        
         const chaptersRead = await getChaptersReadCount();
         const weeklyHours = await getWeeklyReadingTime();
         const chartData = await getWeeklyReadingData();
+        console.log("Weekly chart data:", chartData);
         
         // Update state with fetched data
         setBibleProgress({
@@ -95,7 +100,10 @@ const Dashboard = () => {
     return (
       <Layout>
         <div className="pt-8 sm:pt-12 flex justify-center items-center min-h-[60vh]">
-          <GrowingSeedAnimation message="Loading your spiritual journey..." />
+          <div className="text-center">
+            <h2 className="text-xl font-semibold mb-4">Loading your spiritual journey...</h2>
+            <p className="text-muted-foreground">Please wait while we load your data.</p>
+          </div>
         </div>
       </Layout>
     );
